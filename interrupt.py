@@ -26,9 +26,11 @@ class MainWindow(QMainWindow):
 
         # self.button_is_checked = True
         self.count = 0
+        self.temp_window_count = 0
         self.blinking = True
         self.just_checked = False
         self.pinFlag = 0
+        self.startBounceOnChange = False
         
         self.pins_in = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
         self.names = ["zero","one","two","three","four","five","six","seven","eight","nine","ten","Charlie","Olive","thirteen"]
@@ -64,13 +66,10 @@ class MainWindow(QMainWindow):
         for pinIndex in range(0, 8):
             self.pins[pinIndex].switch_to_output(value=False)
 
-
-
         # Set 8 - 15 to input
         for pinIndex in range(8, 16):
             self.pins[pinIndex].direction = Direction.INPUT
             self.pins[pinIndex].pull = Pull.UP
-
 
 
         # Set up to check all the port B pins (pins 8-15) w/interrupts!
@@ -96,7 +95,7 @@ class MainWindow(QMainWindow):
             """Callback function to be called when an Interrupt occurs."""
             for pin_flag in mcp.int_flag:
                 # print("Interrupt connected to Pin: {}".format(port))
-                # print("Interrupt - pin number: {} changed to: {}".format(pin_flag,self.pins[pin_flag].value))
+                print("Interrupt - pin number: {} changed to: {}".format(pin_flag,self.pins[pin_flag].value))
                 
                 if (pin_flag > 12): # if this is the short, stereo prong bein hit (first in, last out)
                     # await check_pin(pin_flag)
@@ -111,32 +110,14 @@ class MainWindow(QMainWindow):
                 # print('checking bcz false')
                 self.just_checked = True
 
-                # bounceTimer has been set to singleShot)
-                # self.bounceTimer.timeout.connect(lambda: continueCheckPin(pin_flag))
-                # self.bounceTimer.start(500)
-                # # await asyncio.sleep(0.5)
-                # self.bounceTimer.timeout.connect(continueCheckPin(pin_flag))
-
                 self.pinFlag = pin_flag
                 # self.bounceTimer.start(500)
 
-
                 # trigger change that is detected to create an event in main thread
-                new_window_title = choice(window_titles)
-                print("setting title: %s" % new_window_title)
-                self.setWindowTitle(new_window_title)
-
-
-
-                # will call checkpin
-
-                # QTimer.singleShot(500, lambda: continueCheckPin(pin_flag))
-
-                # self.bounceTimer(500, lambda: continueCheckPin(pin_flag))
-
-                # time.sleep(0.5)
-                # continueCheckPin(pin_flag)
-
+                self.temp_window_count += 1
+                # new_window_title = choice(window_titles)
+                # print("setting title: %s" % new_window_title)
+                self.setWindowTitle("Window title: " + str(self.temp_window_count))
 
         GPIO.add_event_detect(interrupt, GPIO.BOTH, callback=checkPin, bouncetime=30)
 
@@ -148,52 +129,37 @@ class MainWindow(QMainWindow):
     def continueCheckPin(self):
         # print('in continueCheckPin, pin_flag: ' + str(self.pinFlag))
         # print('in continueCheckPin, pin_flag value: ' + str(self.pins[self.pinFlag].value))
-
-        # global just_checked
-        # global pins_in
-        # if (not just_checked):
-            # print('checking bcz false')
-        # just_checked = True
-
-        # # await asyncio.sleep(0.5)
-        # self.blinkTimer.timeout.connect(self.counter)
-        # self.blinkTimer.start(1000)
-
         self.bounceTimer.stop()
-
-        # time.sleep(0.5)
 
         # print("self.pins[self.pinFlag-3].value " + str(self.pinFlag-3) + " val " +
         #       self.pins[self.pinFlag-3].value)
 
         if (self.pins[self.pinFlag-3].value == False):
-            # print("Pin {} is now connected".format(pin_flag-3))
+            print("Pin {} is now connected".format(self.pinFlag-3))
 
             # print("goint to check the following pin flag minus 3: " + str(self.pinFlag))
 
             # print("{} is now connected".format(self.names[self.pinFlagg-3]))
             if (self.pins[self.pinFlag].value == False):
                 print("--- on line 2")
-            self.pins_in[self.pinFlag-3] = True
+            # self.pins_in[self.pinFlag-3] = True
             # stop flash
             self.blinkTimer.stop()
+            # turn this LED on
+            self.pins[self.pinFlag-11].value = True
             # Send msg to screen
-            self.label.setText("-- Hello, I\'d like to speak to Olive")            
+            self.label.setText("Connected to {}  \n".format(self.names[self.pinFlag-3]))
 
-            # await websocket.send('-- Hello, I\'d like to speak to Olive')
-            # websocket.send('-- Hello, I\'d like to speak to Olive')
-            
         else:
             # Handle case of half-plugged -- where only stereo prong engaged
             # i.e. primary was never engaged
             if (self.pins_in[self.pinFlag-3]):
                 # print("-- Pin {} has been disconnected \n".format(pin_flag-3))
                 print("-- {} has been disconnected \n".format(self.names[self.pinFlag-3]))
-                self.pins_in[self.self.pinFlag-3] = False
+                self.pins_in[self.pinFlag-3] = False
 
         # print('now setting true')
-        just_checked = False
-
+        self.just_checked = False
 
     def the_window_title_changed(self, window_title):
         print("window title changed so start bounceTimer: %s" % window_title)
@@ -203,29 +169,11 @@ class MainWindow(QMainWindow):
         self.label.setText("to be counted, & change title")
         # self.counter()
         self.blinkTimer.start(1000)
-        # new_window_title = choice(window_titles)
-        # print("setting title: %s" % new_window_title)
-        # self.setWindowTitle(new_window_title)
-
-    # def the_button_was_clicked(self):
-    #     print("Clicked")
-    #     # new_window_title = choice(window_titles)
-    #     # print("setting title: %s" % new_window_title)
-    #     # self.setWindowTitle(new_window_title)
-
-
-
 
     def counter(self):
         self.count += 1
         self.label.setText("count: " + str(self.count))
         self.pins[3].value = not self.pins[3].value
-        # count = 0
-        # while count < 3:
-        #     self.label.setText("count: " + str(count))
-        #     # time.sleep(1)
-
-
 
 
 app = QApplication([])
