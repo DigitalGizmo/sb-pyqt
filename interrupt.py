@@ -131,8 +131,8 @@ class MainWindow(QMainWindow):
         # print('in continueCheckPin, pin_flag value: ' + str(self.pins[self.pinFlag].value))
         self.bounceTimer.stop()
 
-        # print("self.pins[self.pinFlag-3].value " + str(self.pinFlag-3) + " val " +
-        #       self.pins[self.pinFlag-3].value)
+        print("In continue, pinFlag-3 " + str(self.pinFlag-3) + " val " +
+              str(self.pins[self.pinFlag-3].value))
 
         if (self.pins[self.pinFlag-3].value == False):
             print("Pin {} is now connected".format(self.pinFlag-3))
@@ -142,9 +142,14 @@ class MainWindow(QMainWindow):
             # print("{} is now connected".format(self.names[self.pinFlagg-3]))
             if (self.pins[self.pinFlag].value == False):
                 print("--- on line 2")
-            # self.pins_in[self.pinFlag-3] = True
+                
+            # Set pin in
+            self.pins_in[self.pinFlag-3] = True
+
             # stop flash
-            self.blinkTimer.stop()
+            if self.blinkTimer.isActive():
+                self.blinkTimer.stop()
+
             # turn this LED on
             self.pins[self.pinFlag-11].value = True
             # Send msg to screen
@@ -157,12 +162,14 @@ class MainWindow(QMainWindow):
                 # print("-- Pin {} has been disconnected \n".format(pin_flag-3))
                 print("-- {} has been disconnected \n".format(self.names[self.pinFlag-3]))
                 self.pins_in[self.pinFlag-3] = False
+            else:
+                print("got to pin true, but not pin in")
 
         # print('now setting true')
         self.just_checked = False
 
     def the_window_title_changed(self, window_title):
-        print("window title changed so start bounceTimer: %s" % window_title)
+        print("window title changed so start bounceTimer: %s" % self.pinFlag)
         self.bounceTimer.start(500)
 
     def mousePressEvent(self,e):
