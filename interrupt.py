@@ -29,7 +29,7 @@ class MainWindow(QMainWindow):
         self.temp_window_count = 0
         self.blinking = True
         self.just_checked = False
-        self.pinFlag = 0
+        self.pinFlag = 15
         self.startBounceOnChange = False
         
         self.pins_in = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
@@ -95,13 +95,13 @@ class MainWindow(QMainWindow):
             """Callback function to be called when an Interrupt occurs."""
             for pin_flag in mcp.int_flag:
                 # print("Interrupt connected to Pin: {}".format(port))
-                print("Interrupt - pin number: {} changed to: {}".format(pin_flag,self.pins[pin_flag].value))
+                print("Interrupt - pin number: {} changed to: {} \n".format(pin_flag,self.pins[pin_flag].value))
                 
                 if (pin_flag > 12): # if this is the short, stereo prong bein hit (first in, last out)
                     # await check_pin(pin_flag)
                     startCheckPin(pin_flag)
 
-            mcp.clear_ints()
+            # mcp.clear_ints()
 
         def startCheckPin(pin_flag):
             # global just_checked
@@ -131,7 +131,7 @@ class MainWindow(QMainWindow):
         # print('in continueCheckPin, pin_flag value: ' + str(self.pins[self.pinFlag].value))
         self.bounceTimer.stop()
 
-        print("In continue, pinFlag-3 " + str(self.pinFlag-3) + " val " +
+        print("In continue, pinFlag-3 = " + str(self.pinFlag-3) + " val: " +
               str(self.pins[self.pinFlag-3].value))
 
         if (self.pins[self.pinFlag-3].value == False):
@@ -139,7 +139,7 @@ class MainWindow(QMainWindow):
 
             # print("goint to check the following pin flag minus 3: " + str(self.pinFlag))
 
-            # print("{} is now connected".format(self.names[self.pinFlagg-3]))
+            print("Stereo pin {} aledgedly now: {}".format(self.pinFlag, self.pins[self.pinFlag].value))
             if (self.pins[self.pinFlag].value == False):
                 print("--- on line 2")
                 
@@ -152,6 +152,7 @@ class MainWindow(QMainWindow):
 
             # turn this LED on
             self.pins[self.pinFlag-11].value = True
+
             # Send msg to screen
             self.label.setText("Connected to {}  \n".format(self.names[self.pinFlag-3]))
 
@@ -166,11 +167,13 @@ class MainWindow(QMainWindow):
                 print("got to pin true, but not pin in")
 
         # print('now setting true')
+        # mcp.clear_ints()
+
         self.just_checked = False
 
     def the_window_title_changed(self, window_title):
-        print("window title changed so start bounceTimer: %s" % self.pinFlag)
-        self.bounceTimer.start(500)
+        print("window title changed so start bounceTimer: %s \n" % self.pinFlag)
+        self.bounceTimer.start(1000)
 
     def mousePressEvent(self,e):
         self.label.setText("to be counted, & change title")
@@ -181,6 +184,7 @@ class MainWindow(QMainWindow):
         self.count += 1
         self.label.setText("count: " + str(self.count))
         self.pins[3].value = not self.pins[3].value
+        # print("Count Stereo pin {} aledgedly now: {}".format(self.pinFlag, self.pins[self.pinFlag].value))
 
 
 app = QApplication([])
