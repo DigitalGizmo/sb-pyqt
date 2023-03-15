@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
         self.just_checked = False
         self.pinFlag = 15
         self.startBounceOnChange = False
-        self.pins_in = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
+        self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
         self.names = ["zero","one","two","three","four","five","six","seven","eight","nine","ten","Charlie","Olive","thirteen"]
         self.setWindowTitle("You Are the Operator")
         self.label = QLabel()
@@ -54,7 +54,8 @@ class MainWindow(QMainWindow):
 
         # Set up to check all the port B pins (pins 8-15) w/interrupts!
         # mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
-        self.mcp.interrupt_enable = 0xFF00  # Enable Interrupts in pins 8 - 15
+        # self.mcp.interrupt_enable = 0xFF00  # Enable Interrupts in pins 8 - 15
+        self.mcp.interrupt_enable = 0b0001111100000000  # Enable Interrupts in pins 8 - 12 aka 0x1f00
 
         # If intcon is set to 0's we will get interrupts on
         # both button presses and button releases
@@ -73,20 +74,32 @@ class MainWindow(QMainWindow):
             """Callback function to be called when an Interrupt occurs."""
             for pin_flag in self.mcp.int_flag:
                 # print("Interrupt connected to Pin: {}".format(port))
+                # print("Interrupt pin_flag: {}".format(pin_flag))
                 print("Interrupt - pin number: {} changed to: {} ".format(pin_flag,self.pins[pin_flag].value))
                 
-                # if (pin_flag > 12): # if this is the short, stereo prong bein hit (first in, last out)
-                #     if (not self.just_checked):
-                #         # print('checking bcz false')
-                #         self.just_checked = True
-                #         self.pinFlag = pin_flag
-                #         # trigger change that is detected to create an event in main thread
-                #         self.temp_window_count += 1
-                #         # new_window_title = choice(window_titles)
-                #         # print("setting title: %s" % new_window_title)
-                #         self.setWindowTitle("Window title: " + str(self.temp_window_count))
+                # if (pin_flag < 13): # don't check the stereo prong on the way in
 
-        GPIO.add_event_detect(interrupt, GPIO.BOTH, callback=checkPin, bouncetime=60)
+                if (not self.just_checked):
+                    # print('checking bcz false')
+                    self.just_checked = True
+                    self.pinFlag = pin_flag
+                    # trigger change that is detected to create an event in main thread
+                    self.temp_window_count += 1
+                    # new_window_title = choice(window_titles)
+                    # print("setting title: %s" % new_window_title)
+                    self.setWindowTitle("Window title: " + str(self.temp_window_count))
+
+                # else: # stereo pin
+                #     # check whether this was unplug. Stereo prong is engaged by the tip on the way out
+                #     # There's only a few microseconds when the tip is disengaged before stereo prong
+                #     # is also disengabed. So the tip change isn't detected
+                #     # See if this is a stereo prong for a line that was engaged
+                #     print("got to 13 or higher {}".format(self.pinFlag-3))
+                #     if (self.pinsIn[self.pinFlag-3]):
+                #         print("Looks like an unplug of {}".format(self.pinFlag-3))
+
+
+        GPIO.add_event_detect(interrupt, GPIO.BOTH, callback=checkPin, bouncetime=100)
 
         self.setFixedSize(QSize(300, 200))
         # self.setCentralWidget(container)
@@ -97,43 +110,52 @@ class MainWindow(QMainWindow):
         # print('in continueCheckPin, pin_flag value: ' + str(self.pins[self.pinFlag].value))
         self.bounceTimer.stop()
 
-        print("In continue, pinFlag-3 = " + str(self.pinFlag-3) + " val: " +
-              str(self.pins[self.pinFlag-3].value))
+        print("In continue, pinFlag = " + str(self.pinFlag) + " val: " +
+              str(self.pins[self.pinFlag].value))
 
-        if (self.pins[self.pinFlag-3].value == False):
-            print("Pin {} is now connected".format(self.pinFlag-3))
+        if (self.pins[self.pinFlag].value == False): # grounded by cable
+            print("Pin {} is now connected".format(self.pinFlag))
 
-            print("Stereo pin {} aledgedly now: {}".format(self.pinFlag, self.pins[self.pinFlag].value))
-            if (self.pins[self.pinFlag].value == False):
-                print("--- on line 2")
+            line = "line 1"
+
+            print("Stereo pin {} aledgedly now: {}".format(self.pinFlag+3, self.pins[self.pinFlag+3].value))
+            if (self.pins[self.pinFlag+3].value == True):
+                line = "line 2"
                 
+            print("--- on: " + line)
+            
             # Set pin in
-            self.pins_in[self.pinFlag-3] = True
+            self.pinsIn[self.pinFlag] = True
 
             # stop flash
             if self.blinkTimer.isActive():
                 self.blinkTimer.stop()
 
             # turn this LED on
-            self.pins[self.pinFlag-11].value = True
+            self.pins[self.pinFlag-8].value = True
 
             # Send msg to screen
-            self.label.setText("Connected to {}  \n".format(self.names[self.pinFlag-3]))
+            self.label.setText("Connected to {}  \n".format(self.names[self.pinFlag]))
 
-        else:
-            # Handle case of half-plugged -- where only stereo prong engaged
-            # i.e. primary was never engaged
-            if (self.pins_in[self.pinFlag-3]):
+        else: # pin flag True, still, or again, high
+            # was this a legit unplug?
+            if (self.pinsIn[self.pinFlag]): # was plugged in
                 # print("-- Pin {} has been disconnected \n".format(pin_flag-3))
-                print("-- {} has been disconnected \n".format(self.names[self.pinFlag-3]))
-                self.pins_in[self.pinFlag-3] = False
+                print("-- {} has been disconnected \n".format(self.names[self.pinFlag]))
+                # debug message
+                self.label.setText(" {} unplugged \n".format(self.names[self.pinFlag]))
+
+                self.pinsIn[self.pinFlag] = False
             else:
-                print("got to pin true, but not pin in")
+                # self.label.setText("Illegitimate unplug from {}  \n".format(self.names[self.pinFlag]))
+
+                print("got to pin true (changed to high), but not pin in")
         
         print("finished check \n")
 
         # self.mcp.clear_ints()
         self.just_checked = False
+
 
     def the_window_title_changed(self, window_title):
         print("window title changed so start bounceTimer: %s " % self.pinFlag)
