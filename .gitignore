@@ -1,5 +1,6 @@
 .venv
 __pycache__
-static/audio
+/audio
+audio/
 
 .DS_Store
