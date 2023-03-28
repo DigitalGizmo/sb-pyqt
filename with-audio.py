@@ -8,19 +8,30 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QVBo
 # from PyQt5.QtMultimedia import QSound
 # from playsound import playsound
 # import pygame
-from omxplayer.player import OMXPlayer
+# from omxplayer.player import OMXPlayer
+import vlc
 import board
 import busio
 from digitalio import Direction, Pull
 from RPi import GPIO
 from adafruit_mcp230xx.mcp23017 import MCP23017
 
-
-
 class MainWindow(QMainWindow): 
+    # Almost all of this should be in separate module analogous to svelte Panel
     def __init__(self):
         # self.pygame.init()
         super().__init__()
+
+        self.setWindowTitle("You Are the Operator")
+        self.label = QLabel(self)
+        self.label.setWordWrap(True)
+        self.label.setText("Keep your ears open for incoming calls!")
+        self.label.setAlignment(Qt.AlignTop)
+        # self.label.setStyleSheet("vertical-align: top;")
+        self.setWindowTitle("You're the Operator")
+        self.setGeometry(200,120,700,200)
+        self.setCentralWidget(self.label)
+
         self.count = 0
         self.temp_window_count = 0
         self.blinking = True
@@ -29,19 +40,21 @@ class MainWindow(QMainWindow):
         self.startBounceOnChange = False
         self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
         self.names = ["zero","one","two","three","four","five","six","seven","eight","nine","ten","Charlie","Olive","thirteen"]
-        self.setWindowTitle("You Are the Operator")
-        self.label = QLabel()
-        self.label.setWordWrap(True)
-        self.label.setText("Lorem")
         self.blinkTimer=QTimer()
         self.blinkTimer.timeout.connect(self.counter)
-        self.buzzer = None
-        self.incoming = None
+        # self.buzzer = None
+        self.buzzer = vlc.MediaPlayer("/home/pi/apps/sb-pyqt/audio/buzzer.wav")
 
+        self.incoming = None
+        self.ring = None
+        self.convo = None
+        self.whichLineInUse = -1
+        self.whichLinePlugging = -1
         self.bounceTimer=QTimer()
-        # self.bounceTimer.setSingleShot(True)
         self.bounceTimer.timeout.connect(self.continueCheckPin)
-        # QTimer.singleShot(500, lambda: continueCheckPin(pin_flag))
+        # Until I figure out a callback for when finished
+        self.ringTimer=QTimer()
+        self.ringTimer.timeout.connect(self.playConvo)
 
         self.windowTitleChanged.connect(self.the_window_title_changed)
 
@@ -87,8 +100,6 @@ class MainWindow(QMainWindow):
                 # print("Interrupt pin_flag: {}".format(pin_flag))
                 print("Interrupt - pin number: {} changed to: {} ".format(pin_flag,self.pins[pin_flag].value))
                 
-                # if (pin_flag < 13): # don't check the stereo prong on the way in
-
                 if (not self.just_checked):
                     # print('checking bcz false')
                     self.just_checked = True
@@ -99,21 +110,7 @@ class MainWindow(QMainWindow):
                     # print("setting title: %s" % new_window_title)
                     self.setWindowTitle("Window title: " + str(self.temp_window_count))
 
-                # else: # stereo pin
-                #     # check whether this was unplug. Stereo prong is engaged by the tip on the way out
-                #     # There's only a few microseconds when the tip is disengaged before stereo prong
-                #     # is also disengabed. So the tip change isn't detected
-                #     # See if this is a stereo prong for a line that was engaged
-                #     print("got to 13 or higher {}".format(self.pinFlag-3))
-                #     if (self.pinsIn[self.pinFlag-3]):
-                #         print("Looks like an unplug of {}".format(self.pinFlag-3))
-
-
         GPIO.add_event_detect(interrupt, GPIO.BOTH, callback=checkPin, bouncetime=100)
-
-        self.setFixedSize(QSize(300, 200))
-        # self.setCentralWidget(container)
-        self.setCentralWidget(self.label)
 
     def continueCheckPin(self):
         # print('in continueCheckPin, pin_flag: ' + str(self.pinFlag))
@@ -126,13 +123,14 @@ class MainWindow(QMainWindow):
         if (self.pins[self.pinFlag].value == False): # grounded by cable
             print("Pin {} is now connected".format(self.pinFlag))
 
-            line = "line 1"
+            # line = "line 1"
+            self.whichLinePlugging = 0
 
             print("Stereo pin {} aledgedly now: {}".format(self.pinFlag+3, self.pins[self.pinFlag+3].value))
             if (self.pins[self.pinFlag+3].value == True):
-                line = "line 2"
+                self.whichLinePlugging = 1
                 
-            print("--- on: " + line)
+            print("--- on: " + str(self.whichLinePlugging))
             
             # Set pin in
             self.pinsIn[self.pinFlag] = True
@@ -142,16 +140,46 @@ class MainWindow(QMainWindow):
                 self.blinkTimer.stop()
             
             # stop buzzer
-            self.buzzer.quit()
+            self.buzzer.stop()
 
-            # turn this LED on
-            self.pins[self.pinFlag-8].value = True
+            if self.pinFlag == 11:
+                # start incoming request
+                self.incoming = vlc.MediaPlayer("/home/pi/apps/sb-pyqt/audio/1-Charlie_Operator.wav")
+                self.incoming.play()
+                # tracking lines
+                self.whichLineInUse = self.whichLinePlugging
+                # turn this LED on
+                self.pins[self.pinFlag-8].value = True
 
-            # start incoming request
-            self.incoming = OMXPlayer("/home/pi/apps/sb-pyqt/audio/1-Charlie_Operator.wav")
+                # Send msg to screen
+                self.label.setText("Hi.  72 please.")
+                print("Connected to {}  \n".format(self.names[self.pinFlag]))
+            elif self.pinFlag == 12:
+                # stop incoming request
+                print("Connected to {}  \n".format(self.names[self.pinFlag]))
 
-            # Send msg to screen
-            self.label.setText("Connected to {}  \n".format(self.names[self.pinFlag]))
+                if self.whichLinePlugging == self.whichLineInUse:
+                    # turn this LED on
+                    self.pins[self.pinFlag-8].value = True
+                    self.incoming.stop()
+                    self.ring = vlc.MediaPlayer("/home/pi/apps/sb-pyqt/audio/outgoing-ring.wav")
+                    self.ring.play()
+
+                    # Until I figure out a callback for when finished
+                    self.ringTimer.start(2000)
+                    self.label.setText(
+                        "Olive:  Hello? <br />" +
+                        "Charlie:  Hi Olive, it’s Charlie.  Bowling's off. <br />" +
+                        "Olive:  What's wrong? <br />" +
+                        "Charlie:  My dad has a sick patient and he's taken the car. <br/>" +
+                        "Olive:  I suppose that’s what it’s like when your dad’s a doctor. <br/>" +
+                        "Charlie: Yeh.  He said I can’t hang out if he’s not here. <br/>" +
+                        "Olive: That’s OK.  Maybe my mom can take us tomorrow. <br/>" +
+                        "Charlie: That’d be cool.  But I gotta go.  Bye. <br/>" +
+                        "Olive: Bye, bye."                
+                    )
+                else:
+                    print("wrong line")
 
         else: # pin flag True, still, or again, high
             # was this a legit unplug?
@@ -159,7 +187,7 @@ class MainWindow(QMainWindow):
                 # print("-- Pin {} has been disconnected \n".format(pin_flag-3))
                 print("-- {} has been disconnected \n".format(self.names[self.pinFlag]))
                 # debug message
-                self.label.setText(" {} unplugged \n".format(self.names[self.pinFlag]))
+                # self.label.setText(" {} unplugged \n".format(self.names[self.pinFlag]))
 
                 self.pinsIn[self.pinFlag] = False
             else:
@@ -178,22 +206,21 @@ class MainWindow(QMainWindow):
         self.bounceTimer.start(1000)
 
     def mousePressEvent(self,e):
-        self.label.setText("to be counted, & change title")
+        self.label.setText("Keep your ears open for incoming calls")
         # Audio
-        # QSound.play("audio/buzzer.wav")
-        # subprocess.call(['aplay -fdat /home/pi/apps/sb-pyqt/audio/buzzer.wav'], shell=True)
-        self.buzzer = OMXPlayer("/home/pi/apps/sb-pyqt/audio/buzzer.wav")
-
-        # block = False so sound will play asynchronously 
-        # playsound("audio/buzzer.wav", block=False)
+        self.buzzer.play()
         self.blinkTimer.start(1000)
 
     def counter(self):
         self.count += 1
-        # self.label.setText("count: " + str(self.count))
         self.pins[3].value = not self.pins[3].value
         # print("Count Stereo pin {} aledgedly now: {}".format(self.pinFlag, self.pins[self.pinFlag].value))
 
+    def playConvo(self):
+        self.ring.stop()
+        self.ringTimer.stop()
+        self.convo = vlc.MediaPlayer("/home/pi/apps/sb-pyqt/audio/2-Charlie_Calls_Olive.wav")
+        self.convo.play()
 
 app = QApplication([])
 
