@@ -1,20 +1,17 @@
 import sys
-# import subprocess
-# import time
-# from random import choice
-# import asyncio
 from PyQt5.QtCore import QSize, Qt, QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout, QWidget
-# from PyQt5.QtMultimedia import QSound
-# from playsound import playsound
-# import pygame
-# from omxplayer.player import OMXPlayer
 import vlc
 import board
 import busio
 from digitalio import Direction, Pull
 from RPi import GPIO
 from adafruit_mcp230xx.mcp23017 import MCP23017
+
+import json
+
+contentJsonFile = open('conversations.json')
+contentPy = json.load(contentJsonFile)
 
 class MainWindow(QMainWindow): 
     # Almost all of this should be in separate module analogous to svelte Panel
@@ -29,7 +26,7 @@ class MainWindow(QMainWindow):
         self.label.setAlignment(Qt.AlignTop)
         # self.label.setStyleSheet("vertical-align: top;")
         self.setWindowTitle("You're the Operator")
-        self.setGeometry(20,120,700,200)
+        self.setGeometry(20,120,600,200)
         self.setCentralWidget(self.label)
 
         self.count = 0
@@ -170,7 +167,11 @@ class MainWindow(QMainWindow):
                 self.pinsLed[self.pinFlag].value = True
 
                 # Send msg to screen
-                self.label.setText("Hi.  72 please.")
+                # self.label.setText("Hi.  72 please.")
+                # self.label.setText(content.charlieHello())
+                self.label.setText(contentPy[1]["helloText"])
+
+
                 print("Connected to {}  \n".format(self.names[self.pinFlag]))
             elif self.pinFlag == 6:
                 # stop incoming request
@@ -187,17 +188,9 @@ class MainWindow(QMainWindow):
 
                     # Until I figure out a callback for when finished
                     self.outgoingToneTimer.start(2000)
-                    self.label.setText(
-                        "Olive:  Hello? <br />" +
-                        "Charlie:  Hi Olive, it’s Charlie.  Bowling's off. <br />" +
-                        "Olive:  What's wrong? <br />" +
-                        "Charlie:  My dad has a sick patient and he's taken the car. <br/>" +
-                        "Olive:  I suppose that’s what it’s like when your dad’s a doctor. <br/>" +
-                        "Charlie: Yeh.  He said I can’t hang out if he’s not here. <br/>" +
-                        "Olive: That’s OK.  Maybe my mom can take us tomorrow. <br/>" +
-                        "Charlie: That’d be cool.  But I gotta go.  Bye. <br/>" +
-                        "Olive: Bye, bye."                
-                    )
+
+                    self.label.setText(contentPy[1]["convoText"])
+
                 else:
                     print("wrong line")
 
