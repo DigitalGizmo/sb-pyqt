@@ -1,6 +1,6 @@
 import sys
-from PyQt5.QtCore import QSize, Qt, QTimer
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt, QTimer, QObject, pyqtSignal
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget
 import vlc
 import board
 import busio
@@ -13,6 +13,9 @@ import json
 contentJsonFile = open('conversations.json')
 contentPy = json.load(contentJsonFile)
 
+class StartupSender(QObject):
+    startPressed = pyqtSignal()
+
 class MainWindow(QMainWindow): 
     # Almost all of this should be in separate module analogous to svelte Panel
     def __init__(self):
@@ -22,7 +25,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("You Are the Operator")
         self.label = QLabel(self)
         self.label.setWordWrap(True)
-        self.label.setText("Keep your ears open for incoming calls!")
+        self.label.setText("Keep your ears open for incoming calls! ")
         self.label.setAlignment(Qt.AlignTop)
         # self.label.setStyleSheet("vertical-align: top;")
         self.setWindowTitle("You're the Operator")
@@ -55,6 +58,13 @@ class MainWindow(QMainWindow):
 
         self.windowTitleChanged.connect(self.the_window_title_changed)
 
+        # Experiment with changed.connect
+        # self.startUpTimer=QTimer()
+        # self.startUpTimer.timeout.connect(self.continueCheckPin)        
+        self.startUpObject = StartupSender()
+        self.startUpObject.startPressed.connect(self.startFirstCall)
+
+
         # Initialize the I2C bus:
         i2c = busio.I2C(board.SCL, board.SDA)
         self.mcp = MCP23017(i2c) # default address-0x20
@@ -64,10 +74,10 @@ class MainWindow(QMainWindow):
         # -- Make a list of pins for each bonnet, set input/output --
         # Plug tip, which will trigger interrupts
         self.pins = []
-        for pinIndex in range(0, 12):
+        for pinIndex in range(0, 16):
             self.pins.append(self.mcp.get_pin(pinIndex))
         # Set to input - later will get intrrupt as well
-        for pinIndex in range(0, 12):
+        for pinIndex in range(0, 16):
             self.pins[pinIndex].direction = Direction.INPUT
             self.pins[pinIndex].pull = Pull.UP
 
@@ -89,8 +99,8 @@ class MainWindow(QMainWindow):
            self.pinsLed[pinIndex].switch_to_output(value=False)
 
         # -- Set up Tip interrupt --
-        # self.mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
-        self.mcp.interrupt_enable = 0xFFF  # Enable Interrupts first 12 pins
+        self.mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
+        # self.mcp.interrupt_enable = 0xFFF  # Enable Interrupts first 12 pins
         # self.mcp.interrupt_enable = 0b0000111111111111  # Enable Interrupts in pins 0-11 aka 0xfff
 
         # If intcon is set to 0's we will get interrupts on both
@@ -113,18 +123,32 @@ class MainWindow(QMainWindow):
                 # print("Interrupt connected to Pin: {}".format(port))
                 # print("Interrupt pin_flag: {}".format(pin_flag))
                 print("Interrupt - pin number: {} changed to: {} ".format(pin_flag,self.pins[pin_flag].value))
-                
-                if (not self.just_checked):
-                    # print('checking bcz false')
-                    self.just_checked = True
-                    self.pinFlag = pin_flag
-                    # trigger change that is detected to create an event in main thread
-                    self.temp_window_count += 1
-                    # new_window_title = choice(window_titles)
-                    # print("setting title: %s" % new_window_title)
-                    self.setWindowTitle("Window title: " + str(self.temp_window_count))
+
+                # New for start button
+                if (pin_flag < 12):
+                    # As-ws
+                    if (not self.just_checked):
+                        # print('checking bcz false')
+                        self.just_checked = True
+                        self.pinFlag = pin_flag
+                        # trigger change that is detected to create an event in main thread
+                        self.temp_window_count += 1
+                        # new_window_title = choice(window_titles)
+                        # print("setting title: %s" % new_window_title)
+                        self.setWindowTitle("Window title: " + str(self.temp_window_count))
+                        # Changing window title will trigger bounceTimer, which, in turn
+                        # will trigger continuCheckPin
+                        # Work-around for action loop
+                else:
+                    print("got to interupt 12 or greater")
+                    self.startUpObject.startPressed.emit()
+                    # if (pin_flag == 12):
+                    #     # self.setGeometry(20,120,600,190)
+                    #     self.label.setWordWrap(False)
+
 
         GPIO.add_event_detect(interrupt, GPIO.BOTH, callback=checkPin, bouncetime=100)
+
 
     def continueCheckPin(self):
         # print('in continueCheckPin, pin_flag: ' + str(self.pinFlag))
@@ -213,16 +237,21 @@ class MainWindow(QMainWindow):
         # self.mcp.clear_ints()
         self.just_checked = False
 
-
     def the_window_title_changed(self, window_title):
         print("window title changed so start bounceTimer: %s " % self.pinFlag)
         self.bounceTimer.start(1000)
 
-    def mousePressEvent(self,e):
-        self.label.setText("Keep your ears open for incoming calls")
+    def startFirstCall(self):
+        self.label.setText("Incoming call")
         # Audio
         self.buzzer.play()
         self.blinkTimer.start(500)
+
+    # def mousePressEvent(self,e):
+    #     self.label.setText("Keep your ears open for incoming calls")
+    #     # Audio
+    #     self.buzzer.play()
+    #     self.blinkTimer.start(500)
 
     def counter(self):
         self.count += 1
