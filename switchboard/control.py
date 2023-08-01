@@ -43,7 +43,7 @@ class MainWindow(QMainWindow):
         self.blinkTimer=QTimer()
         self.blinkTimer.timeout.connect(self.counter)
         # self.buzzer = None
-        self.buzzer = vlc.MediaPlayer("/home/pi/apps/sb-pyqt/audio/buzzer.wav")
+        self.buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
 
         self.incoming = None
         self.outgoingTone = None
@@ -184,7 +184,7 @@ class MainWindow(QMainWindow):
                 # track lines
                 self.whichLineInUse = self.whichLinePlugging
                 # start incoming request
-                self.incoming = vlc.MediaPlayer("/home/pi/apps/sb-pyqt/audio/1-Charlie_Operator.wav")
+                self.incoming = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
                 self.incoming.play()
 
                 # # turn this LED on
@@ -193,7 +193,7 @@ class MainWindow(QMainWindow):
                 # Send msg to screen
                 # self.label.setText("Hi.  72 please.")
                 # self.label.setText(content.charlieHello())
-                self.label.setText(contentPy[1]["helloText"])
+                self.label.setText(contentPy[0]["helloText"])
 
 
                 print("Connected to {}  \n".format(self.names[self.pinFlag]))
@@ -207,13 +207,13 @@ class MainWindow(QMainWindow):
                     self.pinsLed[self.pinFlag].value = True
 
                     self.incoming.stop()
-                    self.outgoingTone = vlc.MediaPlayer("/home/pi/apps/sb-pyqt/audio/outgoing-ring.wav")
+                    self.outgoingTone = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
                     self.outgoingTone.play()
 
                     # Until I figure out a callback for when finished
                     self.outgoingToneTimer.start(2000)
 
-                    self.label.setText(contentPy[1]["convoText"])
+                    self.label.setText(contentPy[0]["convoText"])
 
                 else:
                     print("wrong line")
@@ -264,7 +264,7 @@ class MainWindow(QMainWindow):
     def playConvo(self):
         self.outgoingTone.stop()
         self.outgoingToneTimer.stop()
-        self.convo = vlc.MediaPlayer("/home/pi/apps/sb-pyqt/audio/2-Charlie_Calls_Olive.wav")
+        self.convo = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/2-Charlie_Calls_Olive.mp3")
         self.convo.play()
 
 app = QApplication([])
