@@ -16,8 +16,6 @@ class Panel(qtw.QWidget):
     startPressed = qtc.pyqtSignal()
     pinChanged = qtc.pyqtSignal(str)
 
-    pinTest = qtc.pyqtSignal()
-
     def __init__(self):
         super().__init__()
         # ------ PyQt Section -------
@@ -29,23 +27,17 @@ class Panel(qtw.QWidget):
         self.just_checked = False
         self.pinFlag = 15
         self.startBounceOnChange = False
-        self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
 
         # -- signal connections
         # self.startUpObject = StartupSender()
         # self.startPressed.connect(self.startFirstCall)
         self.startPressed.connect(self.onStart)
-        
-        
-        self.pinTest.connect(self.pinChangeDetected)
-
 
         # self.pinChanged.connect(self.pinChangeDetected) # pinChangeDetected starts timer
-        # self.pinChanged.connect(self.continueCheckPin)
-        # self.pinTest.connect(self.continueCheckPin)
+        self.pinChanged.connect(self.continueCheckPin)
 
-        self.bounceTimer=qtc.QTimer()
-        self.bounceTimer.timeout.connect(self.continueCheckPin)
+        # self.bounceTimer=qtc.QTimer()
+        # self.bounceTimer.timeout.connect(self.continueCheckPin)
 
 
         # Initialize the I2C bus:
@@ -107,24 +99,19 @@ class Panel(qtw.QWidget):
             for pin_flag in self.mcp.int_flag:
                 # print("Interrupt connected to Pin: {}".format(port))
                 # print("Interrupt pin_flag: {}".format(pin_flag))
-                # print(f"Interrupt - pin number: {pin_flag} changed to: {self.pins[pin_flag].value} ")
+                print(f"Interrupt - pin number: {pin_flag} changed to: {self.pins[pin_flag].value} ")
 
                 # New for start button
                 if (pin_flag < 12):
                     # As-ws
                     print(f"about to check pin. just_checked is: {self.just_checked}")
                     if (not self.just_checked):
-                        # print('checking bcz false')
+                        print('checking bcz false')
                         self.just_checked = True
                         self.pinFlag = pin_flag
 
-                        # print(f"Got to jack: {pin_flag}")
-
-
-                        # self.pinChanged.emit(f"pin_flag: {pin_flag} detected")
-
-                        self.pinTest.emit()
-
+                        print(f"Got to jack: {pin_flag}")
+                        self.pinChanged.emit(f"pin_flag: {pin_flag} detected")
 
                         # self.setWindowTitle("Window title: " + str(self.temp_window_count))
                         
@@ -149,17 +136,23 @@ class Panel(qtw.QWidget):
     def onStart(self):
         self.submitted.emit('We can start now')
 
-    # def pinChangeDetected(self, msg):
-    def pinChangeDetected(self):
-        # self.submitted.emit('We can start now')
-        # print(f"pinChangeDetected, pin: {msg}")
-        print(f"pinChangeDetected, start bounceTimer")
-        self.bounceTimer.start(1000)
+    # def onPinChange(self, msg):
+    #     self.submitted.emit('We can start now')
+    #     # self.close()
 
     # def continueCheckPin(self, msg):
     def continueCheckPin(self):
-        self.bounceTimer.stop()
-        # print(f"got to continueCheckPin. just_checked = {self.just_checked}")
+        # self.submitted.emit('We can start now')
+        # self.bounceTimer.stop()
+        print(f"got to continueCheckPin. just_checked = {self.just_checked}")
         self.submitted.emit('this is from continueCheckPin')
         self.just_checked = False
         print(f"in continueCheckPin. Should be false - just_checked = {self.just_checked}")
+
+
+
+
+    def pinChangeDetected(self, msg):
+        # self.submitted.emit('We can start now')
+        print(f"pinChangeDetected, pin: {msg}")
+        self.bounceTimer.start(1000)

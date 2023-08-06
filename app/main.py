@@ -28,11 +28,17 @@ class MainWindow(qtw.QWidget):
         self.panel = Panel()
         # self.panel.submitted.connect(self.label.setText)
         self.panel.submitted.connect(self.handleInput)
+
+        
+
         self.panel.show()   
+
+
+
 
     # def onChange(self):
     def handleInput(self, input):
-        print('got to handle input')
+        print(f"got to handle input: {input}")
         self.label.setText(input)
 
 if __name__ == '__main__':
