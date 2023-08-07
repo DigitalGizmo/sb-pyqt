@@ -1,4 +1,5 @@
 import sys
+import json
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtCore as qtc
 
@@ -9,16 +10,16 @@ from digitalio import Direction, Pull
 from RPi import GPIO
 from adafruit_mcp230xx.mcp23017 import MCP23017
 
-import json
+from model import Model
 
 contentJsonFile = open('conversations.json')
 contentPy = json.load(contentJsonFile)
 
-class StartupSender(qtc.QObject):
-    startPressed = qtc.pyqtSignal()
-
 class MainWindow(qtw.QMainWindow): 
     # Almost all of this should be in separate module analogous to svelte Panel
+
+    startPressed = qtc.pyqtSignal()
+
     def __init__(self):
         # self.pygame.init()
         super().__init__()
@@ -32,6 +33,8 @@ class MainWindow(qtw.QMainWindow):
         self.setWindowTitle("You're the Operator")
         self.setGeometry(20,120,600,200)
         self.setCentralWidget(self.label)
+
+        self.model = Model()
 
         self.count = 0
         self.temp_window_count = 0
@@ -61,9 +64,12 @@ class MainWindow(qtw.QMainWindow):
 
         # Experiment with changed.connect
         # self.startUpTimer=QTimer()
-        # self.startUpTimer.timeout.connect(self.continueCheckPin)        
-        self.startUpObject = StartupSender()
-        self.startUpObject.startPressed.connect(self.startFirstCall)
+        # self.startUpTimer.timeout.connect(self.continueCheckPin)  
+           
+        # self.startPressed.connect(self.startFirstCall)
+        self.startPressed.connect(self.model.handleStart)
+
+        self.model.displayText.connect(self.setScreenLabel)
 
 
         # Initialize the I2C bus:
@@ -91,7 +97,7 @@ class MainWindow(qtw.QMainWindow):
             self.pinsRing[pinIndex].direction = Direction.INPUT
             self.pinsRing[pinIndex].pull = Pull.UP
 
-        # Stereo "ring" which will detect 1st vs 2nd line
+        # LEDs which will detect 1st vs 2nd line
         self.pinsLed = []
         for pinIndex in range(0, 12):
             self.pinsLed.append(self.mcpLed.get_pin(pinIndex))
@@ -142,7 +148,7 @@ class MainWindow(qtw.QMainWindow):
                         # Work-around for action loop
                 else:
                     print("got to interupt 12 or greater")
-                    self.startUpObject.startPressed.emit()
+                    self.startPressed.emit()
                     # if (pin_flag == 12):
                     #     # self.setGeometry(20,120,600,190)
                     #     self.label.setWordWrap(False)
@@ -267,6 +273,9 @@ class MainWindow(qtw.QMainWindow):
         self.outgoingToneTimer.stop()
         self.convo = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/2-Charlie_Calls_Olive.mp3")
         self.convo.play()
+
+    def setScreenLabel(self, msg):
+        self.label.setText(msg)        
 
 app = qtw.QApplication([])
 
