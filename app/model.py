@@ -11,6 +11,8 @@ from RPi import GPIO
 from adafruit_mcp230xx.mcp23017 import MCP23017
 
 class Model(qtc.QObject):
+    """Main logic patterned after software proto
+    """
     displayText = qtc.pyqtSignal(str)
     # self.buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
     # buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
@@ -36,7 +38,7 @@ class Model(qtc.QObject):
 
 
     def handlePlugIn(self, pluggedIdxInfo):
-        """Main logic patterned after software proto
+        """triggered by control.py
         """
         print(f"handlePlugIn: {pluggedIdxInfo}")
 
@@ -45,6 +47,15 @@ class Model(qtc.QObject):
         if self.blinkTimer.isActive():
             self.blinkTimer.stop()
         self.buzzer.stop()
+
+
+    def handleUnPlug(self, pinIndex):
+        """ triggered by control.py
+        """
+        print(f"handle unPlug: {pinIndex}")
+
+
+
 
     def blinker(self):
         self.pinsLed[4].value = not self.pinsLed[4].value

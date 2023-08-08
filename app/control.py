@@ -19,7 +19,9 @@ class MainWindow(qtw.QMainWindow):
     # Almost all of this should be in separate module analogous to svelte Panel
 
     startPressed = qtc.pyqtSignal()
-    plugEventDetected = qtc.pyqtSignal(str)
+    plugEventDetected = qtc.pyqtSignal()
+    plugInToHandle = qtc.pyqtSignal(str)
+    unPlugToHandle = qtc.pyqtSignal(str)
 
     def __init__(self):
         # self.pygame.init()
@@ -71,6 +73,8 @@ class MainWindow(qtw.QMainWindow):
         self.startPressed.connect(self.model.handleStart)
 
         self.plugEventDetected.connect(lambda: self.bounceTimer.start(1000))
+        self.plugInToHandle.connect(self.model.handlePlugIn)
+        self.unPlugToHandle.connect(self.model.handleUnPlug)
 
         self.model.displayText.connect(self.setScreenLabel)
 
@@ -140,7 +144,8 @@ class MainWindow(qtw.QMainWindow):
                         # print("setting title: %s" % new_window_title)
 
                         # self.setWindowTitle("Window title: " + str(self.temp_window_count))
-                        self.plugEventDetected.emit(f"idxInfo:  {pin_flag}")
+                        # self.plugEventDetected.emit(f"idxInfo:  {pin_flag}")
+                        self.plugEventDetected.emit()
 
 
                         # Changing window title will trigger bounceTimer, which, in turn
@@ -165,7 +170,7 @@ class MainWindow(qtw.QMainWindow):
         self.bounceTimer.stop()
 
         if (self.pins[self.pinFlag].value == False): # grounded by cable
-            print("Pin {} is now connected".format(self.pinFlag))
+            print(f"Pin {self.pinFlag} is now connected")
 
             # line = "line 1"
             self.whichLinePlugging = 0
@@ -176,8 +181,14 @@ class MainWindow(qtw.QMainWindow):
                 
             print("--- on: " + str(self.whichLinePlugging))
             
+
+            # Send plugin info to model.py
+            self.plugInToHandle.emit(f"plugin - pin: {self.pinFlag}, line: {self.whichLinePlugging}")
+
+
             # Set pin in
             self.pinsIn[self.pinFlag] = True
+
 
             # # stop flash
             # if self.blinkTimer.isActive():
@@ -225,6 +236,10 @@ class MainWindow(qtw.QMainWindow):
                     print("wrong line")
 
         else: # pin flag True, still, or again, high
+            # On unplug we can't tell which line electonicaly 
+            # (diff in shaft is gone), so rely on pinsIn info
+            self.unPlugToHandle.emit(f"unplug - pin: {self.pinFlag}")
+
             # was this a legit unplug?
             if (self.pinsIn[self.pinFlag]): # was plugged in
                 # print("-- Pin {} has been disconnected \n".format(pin_flag-3))
