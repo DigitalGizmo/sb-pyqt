@@ -40,6 +40,12 @@ class Model(qtc.QObject):
         """
         print(f"handlePlugIn: {pluggedIdxInfo}")
 
+        # Temp one size fits all
+        # stop flash
+        if self.blinkTimer.isActive():
+            self.blinkTimer.stop()
+        self.buzzer.stop()
+
     def blinker(self):
         self.pinsLed[4].value = not self.pinsLed[4].value
 

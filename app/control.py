@@ -19,18 +19,19 @@ class MainWindow(qtw.QMainWindow):
     # Almost all of this should be in separate module analogous to svelte Panel
 
     startPressed = qtc.pyqtSignal()
+    plugEventDetected = qtc.pyqtSignal(str)
 
     def __init__(self):
         # self.pygame.init()
         super().__init__()
 
+        # ------- pyqt window ----
         self.setWindowTitle("You Are the Operator")
         self.label = qtw.QLabel(self)
         self.label.setWordWrap(True)
         self.label.setText("Keep your ears open for incoming calls! ")
         self.label.setAlignment(qtc.Qt.AlignTop)
         # self.label.setStyleSheet("vertical-align: top;")
-        self.setWindowTitle("You're the Operator")
         self.setGeometry(20,120,600,200)
         self.setCentralWidget(self.label)
 
@@ -51,13 +52,16 @@ class MainWindow(qtw.QMainWindow):
         self.convo = None
         self.whichLineInUse = -1
         self.whichLinePlugging = -1
+
+
         self.bounceTimer=qtc.QTimer()
         self.bounceTimer.timeout.connect(self.continueCheckPin)
+
+
         # Until I figure out a callback for when finished
         self.outgoingToneTimer=qtc.QTimer()
         self.outgoingToneTimer.timeout.connect(self.playConvo)
 
-        self.windowTitleChanged.connect(self.the_window_title_changed)
 
         # Experiment with changed.connect
         # self.startUpTimer=QTimer()
@@ -66,8 +70,9 @@ class MainWindow(qtw.QMainWindow):
         # self.startPressed.connect(self.startFirstCall)
         self.startPressed.connect(self.model.handleStart)
 
-        self.model.displayText.connect(self.setScreenLabel)
+        self.plugEventDetected.connect(lambda: self.bounceTimer.start(1000))
 
+        self.model.displayText.connect(self.setScreenLabel)
 
         # Initialize the I2C bus:
         i2c = busio.I2C(board.SCL, board.SDA)
@@ -93,6 +98,8 @@ class MainWindow(qtw.QMainWindow):
         for pinIndex in range(0, 12):
             self.pinsRing[pinIndex].direction = Direction.INPUT
             self.pinsRing[pinIndex].pull = Pull.UP
+
+        # pinsLed are in model.py
 
         # -- Set up Tip interrupt --
         self.mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
@@ -131,7 +138,11 @@ class MainWindow(qtw.QMainWindow):
                         self.temp_window_count += 1
                         # new_window_title = choice(window_titles)
                         # print("setting title: %s" % new_window_title)
-                        self.setWindowTitle("Window title: " + str(self.temp_window_count))
+
+                        # self.setWindowTitle("Window title: " + str(self.temp_window_count))
+                        self.plugEventDetected.emit(f"idxInfo:  {pin_flag}")
+
+
                         # Changing window title will trigger bounceTimer, which, in turn
                         # will trigger continuCheckPin
                         # Work-around for action loop
@@ -147,12 +158,11 @@ class MainWindow(qtw.QMainWindow):
 
 
     def continueCheckPin(self):
-        # print('in continueCheckPin, pin_flag: ' + str(self.pinFlag))
-        # print('in continueCheckPin, pin_flag value: ' + str(self.pins[self.pinFlag].value))
-        self.bounceTimer.stop()
-
+        # Not able to send param through timer, so pinFlag has been set globaly
         print("In continue, pinFlag = " + str(self.pinFlag) + " val: " +
               str(self.pins[self.pinFlag].value))
+
+        self.bounceTimer.stop()
 
         if (self.pins[self.pinFlag].value == False): # grounded by cable
             print("Pin {} is now connected".format(self.pinFlag))
@@ -169,12 +179,12 @@ class MainWindow(qtw.QMainWindow):
             # Set pin in
             self.pinsIn[self.pinFlag] = True
 
-            # stop flash
-            if self.blinkTimer.isActive():
-                self.blinkTimer.stop()
+            # # stop flash
+            # if self.blinkTimer.isActive():
+            #     self.blinkTimer.stop()
             
-            # stop buzzer
-            self.buzzer.stop()
+            # # stop buzzer
+            # self.buzzer.stop()
 
             if self.pinFlag == 4:
                 # track lines
@@ -233,9 +243,11 @@ class MainWindow(qtw.QMainWindow):
         # self.mcp.clear_ints()
         self.just_checked = False
 
-    def the_window_title_changed(self, window_title):
-        print("window title changed so start bounceTimer: %s " % self.pinFlag)
-        self.bounceTimer.start(1000)
+    # def start_bounce_timer_lambda(self, pluggedPinIdx):
+    #     # print("window title changed so start bounceTimer: %s " % self.pinFlag)
+    #     print(f"start_bounce_timer_lambda- pluggedPinIdx: {pluggedPinIdx} ")
+
+    #     self.bounceTimer.start(1000)
 
     def playConvo(self):
         self.outgoingTone.stop()
