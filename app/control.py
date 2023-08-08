@@ -38,17 +38,14 @@ class MainWindow(qtw.QMainWindow):
 
         self.count = 0
         self.temp_window_count = 0
-        self.blinking = True
+        # self.blinking = True
         self.just_checked = False
         self.pinFlag = 15
         self.startBounceOnChange = False
         self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
         self.names = ["Mina","one","two","three","Freeman","five","Olive","seven","eight","nine","ten","eleven","twelve","thirteen"]
-        self.blinkTimer=qtc.QTimer()
-        self.blinkTimer.timeout.connect(self.counter)
-        # self.buzzer = None
-        self.buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
 
+        # ------ call logic------
         self.incoming = None
         self.outgoingTone = None
         self.convo = None
@@ -96,14 +93,6 @@ class MainWindow(qtw.QMainWindow):
         for pinIndex in range(0, 12):
             self.pinsRing[pinIndex].direction = Direction.INPUT
             self.pinsRing[pinIndex].pull = Pull.UP
-
-        # LEDs which will detect 1st vs 2nd line
-        self.pinsLed = []
-        for pinIndex in range(0, 12):
-            self.pinsLed.append(self.mcpLed.get_pin(pinIndex))
-        # Set to output
-        for pinIndex in range(0, 12):
-           self.pinsLed[pinIndex].switch_to_output(value=False)
 
         # -- Set up Tip interrupt --
         self.mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
@@ -247,26 +236,6 @@ class MainWindow(qtw.QMainWindow):
     def the_window_title_changed(self, window_title):
         print("window title changed so start bounceTimer: %s " % self.pinFlag)
         self.bounceTimer.start(1000)
-
-    def startFirstCall(self):
-        self.label.setText("Incoming call")
-        # Audio
-        self.buzzer.play()
-        self.blinkTimer.start(500)
-
-    # def mousePressEvent(self,e):
-    #     self.label.setText("Keep your ears open for incoming calls")
-    #     # Audio
-    #     self.buzzer.play()
-    #     self.blinkTimer.start(500)
-
-    def counter(self):
-        self.count += 1
-
-        self.pinsLed[4].value = not self.pinsLed[4].value
-        # print("count: " + str(self.count))
-
-        # print("Count Stereo pin {} aledgedly now: {}".format(self.pinFlag, self.pins[self.pinFlag].value))
 
     def playConvo(self):
         self.outgoingTone.stop()
