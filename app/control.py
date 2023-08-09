@@ -40,7 +40,7 @@ class MainWindow(qtw.QMainWindow):
         self.model = Model()
 
         self.count = 0
-        self.temp_window_count = 0
+        # self.temp_window_count = 0
         # self.blinking = True
         self.just_checked = False
         self.pinFlag = 15
@@ -48,17 +48,18 @@ class MainWindow(qtw.QMainWindow):
         self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
         self.names = ["Mina","one","two","three","Freeman","five","Olive","seven","eight","nine","ten","eleven","twelve","thirteen"]
 
-        # ------ call logic------
+        # ------ phone call logic------
         self.incoming = None
         self.outgoingTone = None
         self.convo = None
         self.whichLineInUse = -1
         self.whichLinePlugging = -1
 
-
+        # --- timers --- 
         self.bounceTimer=qtc.QTimer()
         self.bounceTimer.timeout.connect(self.continueCheckPin)
-
+        self.blinkTimer=qtc.QTimer()
+        self.blinkTimer.timeout.connect(self.blinker)
 
         # Until I figure out a callback for when finished
         self.outgoingToneTimer=qtc.QTimer()
@@ -69,7 +70,9 @@ class MainWindow(qtw.QMainWindow):
         # self.startUpTimer=QTimer()
         # self.startUpTimer.timeout.connect(self.continueCheckPin)  
            
-        # self.startPressed.connect(self.startFirstCall)
+        # Self for gpia related, self.model for audio
+        # Okay to connect to both
+        self.startPressed.connect(self.handleStart)
         self.startPressed.connect(self.model.handleStart)
 
         self.plugEventDetected.connect(lambda: self.bounceTimer.start(1000))
@@ -104,6 +107,15 @@ class MainWindow(qtw.QMainWindow):
             self.pinsRing[pinIndex].pull = Pull.UP
 
         # pinsLed are in model.py
+        # LEDs 
+        # Tried to put these in the Model/logic module -- but seems all gpio
+        # needs to be in this base/main module
+        self.pinsLed = []
+        for pinIndex in range(0, 12):
+            self.pinsLed.append(self.mcpLed.get_pin(pinIndex))
+        # Set to output
+        for pinIndex in range(0, 12):
+           self.pinsLed[pinIndex].switch_to_output(value=False)
 
         # -- Set up Tip interrupt --
         self.mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
@@ -125,42 +137,32 @@ class MainWindow(qtw.QMainWindow):
 
         # -- code for detection --
         def checkPin(port):
-            """Callback function to be called when an Interrupt occurs."""
+            """Callback function to be called when an Interrupt occurs.
+            The signal for pluginEventDetected calls a timer -- it can't send
+            a parameter, so the work-around is to set pin_flag as a global.
+            """
             for pin_flag in self.mcp.int_flag:
                 # print("Interrupt connected to Pin: {}".format(port))
-                # print("Interrupt pin_flag: {}".format(pin_flag))
-                print("Interrupt - pin number: {} changed to: {} ".format(pin_flag,self.pins[pin_flag].value))
+                print(f"Interrupt - pin number: {pin_flag} changed to: {self.pins[pin_flag].value}")
 
-                # New for start button
+                # Test for phone jack vs start and stop buttons
                 if (pin_flag < 12):
-                    # As-ws
                     if (not self.just_checked):
                         # print('checking bcz false')
                         self.just_checked = True
                         self.pinFlag = pin_flag
-                        # trigger change that is detected to create an event in main thread
-                        self.temp_window_count += 1
-                        # new_window_title = choice(window_titles)
-                        # print("setting title: %s" % new_window_title)
-
-                        # self.setWindowTitle("Window title: " + str(self.temp_window_count))
                         # self.plugEventDetected.emit(f"idxInfo:  {pin_flag}")
+                        # The following signal starts a timer that will continue
+                        # the check. This provides bounce protection
+                        # This signal is separate from the main python event loop
                         self.plugEventDetected.emit()
-
-
-                        # Changing window title will trigger bounceTimer, which, in turn
-                        # will trigger continuCheckPin
-                        # Work-around for action loop
                 else:
                     print("got to interupt 12 or greater")
                     self.startPressed.emit()
                     # if (pin_flag == 12):
-                    #     # self.setGeometry(20,120,600,190)
-                    #     self.label.setWordWrap(False)
-
+                    # self.pinsLed[0].value = True
 
         GPIO.add_event_detect(interrupt, GPIO.BOTH, callback=checkPin, bouncetime=100)
-
 
     def continueCheckPin(self):
         # Not able to send param through timer, so pinFlag has been set globaly
@@ -180,24 +182,25 @@ class MainWindow(qtw.QMainWindow):
                 self.whichLinePlugging = 1
                 
             print("--- on: " + str(self.whichLinePlugging))
-            
 
             # Send plugin info to model.py
             self.plugInToHandle.emit(f"plugin - pin: {self.pinFlag}, line: {self.whichLinePlugging}")
 
-
             # Set pin in
             self.pinsIn[self.pinFlag] = True
 
-
-            # # stop flash
-            # if self.blinkTimer.isActive():
-            #     self.blinkTimer.stop()
-            
-            # # stop buzzer
+            # # stop flashing if on
+            if self.blinkTimer.isActive():
+                self.blinkTimer.stop()
+            # # stop buzzer handled in model
             # self.buzzer.stop()
 
             if self.pinFlag == 4:
+                """ Wow, lot's to do here
+                Can I keep splitting gpio here with logic in model?
+                Could signal from model to a slot here which does things
+                like turn the LED on
+                """
                 # track lines
                 self.whichLineInUse = self.whichLinePlugging
                 # start incoming request
@@ -258,12 +261,19 @@ class MainWindow(qtw.QMainWindow):
         # self.mcp.clear_ints()
         self.just_checked = False
 
-    # def start_bounce_timer_lambda(self, pluggedPinIdx):
-    #     # print("window title changed so start bounceTimer: %s " % self.pinFlag)
-    #     print(f"start_bounce_timer_lambda- pluggedPinIdx: {pluggedPinIdx} ")
+    def handleStart(self):
+        """Just for startup
+        self.model.handleStart is called simultaneously -- for text
+        """
+        print("start up")
+        # self.model.handleStart handles sound
+        self.blinkTimer.start(600)
+        self.pinsLed[4].value = not self.pinsLed[4].value
 
-    #     self.bounceTimer.start(1000)
-
+    def blinker(self):
+        # print("blinking")
+        self.pinsLed[4].value = not self.pinsLed[4].value
+        
     def playConvo(self):
         self.outgoingTone.stop()
         self.outgoingToneTimer.stop()
