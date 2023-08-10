@@ -20,8 +20,8 @@ class MainWindow(qtw.QMainWindow):
 
     startPressed = qtc.pyqtSignal()
     plugEventDetected = qtc.pyqtSignal()
-    plugInToHandle = qtc.pyqtSignal(str)
-    unPlugToHandle = qtc.pyqtSignal(str)
+    plugInToHandle = qtc.pyqtSignal(dict)
+    unPlugToHandle = qtc.pyqtSignal(int)
 
     def __init__(self):
         # self.pygame.init()
@@ -70,7 +70,7 @@ class MainWindow(qtw.QMainWindow):
         # self.startUpTimer=QTimer()
         # self.startUpTimer.timeout.connect(self.continueCheckPin)  
            
-        # Self for gpia related, self.model for audio
+        # Self (control) for gpio related, self.model for audio
         # Okay to connect to both
         self.startPressed.connect(self.handleStart)
         self.startPressed.connect(self.model.handleStart)
@@ -150,7 +150,9 @@ class MainWindow(qtw.QMainWindow):
                     # If this pin is in, delay before checking
                     if (self.pinsIn[pin_flag]):
                         print(f"pin {pin_flag} is already in")
-                        
+                        # To be done: prevent re-check if pin remains in
+                        # after a wiggle
+
                     if (not self.just_checked):
                         # print('checking bcz false')
                         self.just_checked = True
@@ -176,19 +178,28 @@ class MainWindow(qtw.QMainWindow):
         self.bounceTimer.stop()
 
         if (self.pins[self.pinFlag].value == False): # grounded by cable
+            """False/grouded, then this event is a plug-in
+            """
             print(f"Pin {self.pinFlag} is now connected")
 
-            # line = "line 1"
+            # Determine which line
             self.whichLinePlugging = 0
-
             print("Stereo (Ring) pin {} aledgedly now: {}".format(self.pinFlag, self.pinsRing[self.pinFlag].value))
             if (self.pinsRing[self.pinFlag].value == True):
                 self.whichLinePlugging = 1
-                
             print("--- on: " + str(self.whichLinePlugging))
 
+
+
+
             # Send plugin info to model.py
-            self.plugInToHandle.emit(f"plugin - pin: {self.pinFlag}, line: {self.whichLinePlugging}")
+            # Send key value object or duple, or array w two ints
+            # self.plugInToHandle.emit(f"plugin - pin: {self.pinFlag}, line: {self.whichLinePlugging}")
+            self.plugInToHandle.emit({"personIdx": self.pinFlag, "lineIdx": self.whichLinePlugging})
+
+
+
+
 
             # Set pin in
             self.pinsIn[self.pinFlag] = True
@@ -245,7 +256,8 @@ class MainWindow(qtw.QMainWindow):
         else: # pin flag True, still, or again, high
             # On unplug we can't tell which line electonicaly 
             # (diff in shaft is gone), so rely on pinsIn info
-            self.unPlugToHandle.emit(f"unplug - pin: {self.pinFlag}")
+            # self.unPlugToHandle.emit(f"unplug - pin: {self.pinFlag}")
+            self.unPlugToHandle.emit(self.pinFlag)
 
             # was this a legit unplug?
             if (self.pinsIn[self.pinFlag]): # was plugged in

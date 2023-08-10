@@ -40,9 +40,8 @@ class Model(qtc.QObject):
     def handlePlugIn(self, pluggedIdxInfo):
         """triggered by control.py
         """
-        print(f"handlePlugIn: {pluggedIdxInfo}")
+        print(f'handlePlugIn, pin: {pluggedIdxInfo["personIdx"]}, line: {pluggedIdxInfo["lineIdx"]}')
 
-        # Temp one size fits all
         # # stop flash
         # if self.blinkTimer.isActive():
         #     self.blinkTimer.stop()
