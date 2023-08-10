@@ -147,6 +147,10 @@ class MainWindow(qtw.QMainWindow):
 
                 # Test for phone jack vs start and stop buttons
                 if (pin_flag < 12):
+                    # If this pin is in, delay before checking
+                    if (self.pinsIn[pin_flag]):
+                        print(f"pin {pin_flag} is already in")
+                        
                     if (not self.just_checked):
                         # print('checking bcz false')
                         self.just_checked = True
@@ -166,8 +170,8 @@ class MainWindow(qtw.QMainWindow):
 
     def continueCheckPin(self):
         # Not able to send param through timer, so pinFlag has been set globaly
-        print("In continue, pinFlag = " + str(self.pinFlag) + " val: " +
-              str(self.pins[self.pinFlag].value))
+        # print("In continue, pinFlag = " + str(self.pinFlag) + " val: " +
+        #       str(self.pins[self.pinFlag].value))
 
         self.bounceTimer.stop()
 
@@ -215,8 +219,8 @@ class MainWindow(qtw.QMainWindow):
                 # self.label.setText(content.charlieHello())
                 self.label.setText(contentPy[0]["helloText"])
 
-
                 print("Connected to {}  \n".format(self.names[self.pinFlag]))
+
             elif self.pinFlag == 6:
                 # stop incoming request
                 print("Connected to {}  \n".format(self.names[self.pinFlag]))
@@ -231,7 +235,7 @@ class MainWindow(qtw.QMainWindow):
                     self.outgoingTone.play()
 
                     # Until I figure out a callback for when finished
-                    self.outgoingToneTimer.start(2000)
+                    self.outgoingToneTimer.start(1000)
 
                     self.label.setText(contentPy[0]["convoText"])
 
@@ -256,9 +260,15 @@ class MainWindow(qtw.QMainWindow):
 
                 print("got to pin true (changed to high), but not pin in")
         
-        print("finished check \n")
+        # print("finished check \n")
 
         # self.mcp.clear_ints()
+        # self.just_checked = False
+        # Delay setting just_check to false in case the plug is wiggled
+        qtc.QTimer.singleShot(2000, self.delayedFinishCheck)
+
+    def delayedFinishCheck(self):
+        print("delayed finished check \n")
         self.just_checked = False
 
     def handleStart(self):
