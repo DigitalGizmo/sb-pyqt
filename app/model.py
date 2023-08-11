@@ -4,12 +4,6 @@ from PyQt5 import QtGui as qtg
 from PyQt5 import QtCore as qtc
 import vlc
 
-# import board
-# import busio
-# from digitalio import Direction, Pull
-# from RPi import GPIO
-# from adafruit_mcp230xx.mcp23017 import MCP23017
-
 class Model(qtc.QObject):
     """Main logic patterned after software proto
     """
@@ -23,29 +17,52 @@ class Model(qtc.QObject):
         # The following possibly in veiw
         self.buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
 
+        self.whichLineInUse = -1
 
-        # # for control of LED
-        # i2c = busio.I2C(board.SCL, board.SDA)
-        # self.mcpLed = MCP23017(i2c, address=0x21)
-
-        # # LEDs 
-        # self.pinsLed = []
-        # for pinIndex in range(0, 12):
-        #     self.pinsLed.append(self.mcpLed.get_pin(pinIndex))
-        # # Set to output
-        # for pinIndex in range(0, 12):
-        #    self.pinsLed[pinIndex].switch_to_output(value=False)
+        self.phoneLines = [
+            {
+                "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+            },
+            {
+                "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+            }
+        ]
 
 
     def handlePlugIn(self, pluggedIdxInfo):
         """triggered by control.py
         """
         print(f'handlePlugIn, pin: {pluggedIdxInfo["personIdx"]}, line: {pluggedIdxInfo["lineIdx"]}')
-
-        # # stop flash
-        # if self.blinkTimer.isActive():
-        #     self.blinkTimer.stop()
+        # Blinker handdles in control.py
         self.buzzer.stop()
+
+        if pluggedIdxInfo["personIdx"] == 4:
+            """ Wow, lot's to do here
+            """
+            # track lines
+            self.whichLineInUse = pluggedIdxInfo["lineIdx"]
+            # start incoming request
+
+            self.playHello(0, self.whichLineInUse)
+            # self.incoming = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+            # self.incoming.play()
+
+            # # turn this LED on
+            # self.pinsLed[self.pinFlag].value = True
+
+            # Send msg to screen
+            # self.label.setText("Hi.  72 please.")
+            # self.label.setText(content.charlieHello())
+
+
+            # self.label.setText(contentPy[0]["helloText"])
+            self.displayText.emit("Temp Charlie saying hello")
+
+
+            # print("Connected to {}  \n".format(self.names[self.pinFlag]))
+            print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
+
+
 
 
     def handleUnPlug(self, pinIndex):
@@ -66,3 +83,6 @@ class Model(qtc.QObject):
 
         self.displayText.emit("Start text for screen-- Incoming")
 
+    def playHello(self, _currConvo, lineIndex):
+        self.phoneLines[lineIndex] = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+        self.phoneLines[lineIndex].play()

@@ -152,24 +152,21 @@ class MainWindow(qtw.QMainWindow):
 
                 # Test for phone jack vs start and stop buttons
                 if (pin_flag < 12):
-
+                    # Don't restart this interrupt checking if we're still
+                    # in the pause part of bounce checking
                     if (not self.just_checked):
-                        # print('checking bcz false')
                         self.pinFlag = pin_flag
 
                         # If this pin is in, delay before checking
+                        # to protect against inadvertent wiggle
                         if (self.pinsIn[pin_flag]):
                             print(f"pin {pin_flag} is already in")
-                            # To be done: prevent re-check if pin remains in
-                            # after a wiggle
-                            # self.wiggleTimer.start(1000)
+                            # This will trigger a pause
                             self.wiggleDetected.emit()
 
                         else: # pin is not in, new event
                             # do standard check
                             self.just_checked = True
-                            # self.pinFlag = pin_flag
-                            # self.plugEventDetected.emit(f"idxInfo:  {pin_flag}")
                             # The following signal starts a timer that will continue
                             # the check. This provides bounce protection
                             # This signal is separate from the main python event loop
@@ -202,19 +199,17 @@ class MainWindow(qtw.QMainWindow):
                 self.whichLinePlugging = 1
             print("--- on: " + str(self.whichLinePlugging))
 
-            # Send plugin info to model.py
-            # Send key value object or duple, or array w two ints
-            # self.plugInToHandle.emit(f"plugin - pin: {self.pinFlag}, line: {self.whichLinePlugging}")
+            # Send plugin info to model.py as a dict
             self.plugInToHandle.emit({"personIdx": self.pinFlag, "lineIdx": self.whichLinePlugging})
 
+            # Still have to do gpio related tasks here
             # Set pin in
             self.pinsIn[self.pinFlag] = True
 
             # # stop flashing if on
             if self.blinkTimer.isActive():
                 self.blinkTimer.stop()
-            # # stop buzzer handled in model
-            # self.buzzer.stop()
+            # Buzzer stop handled in model.
 
             if self.pinFlag == 4:
                 """ Wow, lot's to do here
@@ -223,10 +218,12 @@ class MainWindow(qtw.QMainWindow):
                 like turn the LED on
                 """
                 # track lines
+                # Also in model
                 self.whichLineInUse = self.whichLinePlugging
-                # start incoming request
-                self.incoming = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
-                self.incoming.play()
+
+                # # start incoming request
+                # self.incoming = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+                # self.incoming.play()
 
                 # # turn this LED on
                 self.pinsLed[self.pinFlag].value = True
@@ -234,9 +231,10 @@ class MainWindow(qtw.QMainWindow):
                 # Send msg to screen
                 # self.label.setText("Hi.  72 please.")
                 # self.label.setText(content.charlieHello())
-                self.label.setText(contentPy[0]["helloText"])
 
-                print("Connected to {}  \n".format(self.names[self.pinFlag]))
+                # self.label.setText(contentPy[0]["helloText"])
+
+                print("in control: Connected to {} ".format(self.names[self.pinFlag]))
 
             elif self.pinFlag == 6:
                 # stop incoming request
@@ -291,7 +289,10 @@ class MainWindow(qtw.QMainWindow):
 
     def checkWiggle(self):
         print("got to checkWiggle")
+
         self.wiggleTimer.stop()
+
+        
         # Check whether the pin still grounded
         # if no longer grounded, proceed with event detection
         if (not self.pins[self.pinFlag].value == False):
