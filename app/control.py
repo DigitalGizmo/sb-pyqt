@@ -22,6 +22,7 @@ class MainWindow(qtw.QMainWindow):
     plugEventDetected = qtc.pyqtSignal()
     plugInToHandle = qtc.pyqtSignal(dict)
     unPlugToHandle = qtc.pyqtSignal(int)
+    wiggleDetected = qtc.pyqtSignal()
 
     def __init__(self):
         # self.pygame.init()
@@ -60,6 +61,10 @@ class MainWindow(qtw.QMainWindow):
         self.bounceTimer.timeout.connect(self.continueCheckPin)
         self.blinkTimer=qtc.QTimer()
         self.blinkTimer.timeout.connect(self.blinker)
+        # Supress interrupt when plug is just wiggled
+        self.wiggleDetected.connect(lambda: self.wiggleTimer.start(1000))
+        self.wiggleTimer=qtc.QTimer()
+        self.wiggleTimer.timeout.connect(self.checkWiggle)
 
         # Until I figure out a callback for when finished
         self.outgoingToneTimer=qtc.QTimer()
@@ -147,21 +152,29 @@ class MainWindow(qtw.QMainWindow):
 
                 # Test for phone jack vs start and stop buttons
                 if (pin_flag < 12):
-                    # If this pin is in, delay before checking
-                    if (self.pinsIn[pin_flag]):
-                        print(f"pin {pin_flag} is already in")
-                        # To be done: prevent re-check if pin remains in
-                        # after a wiggle
 
                     if (not self.just_checked):
                         # print('checking bcz false')
-                        self.just_checked = True
                         self.pinFlag = pin_flag
-                        # self.plugEventDetected.emit(f"idxInfo:  {pin_flag}")
-                        # The following signal starts a timer that will continue
-                        # the check. This provides bounce protection
-                        # This signal is separate from the main python event loop
-                        self.plugEventDetected.emit()
+
+                        # If this pin is in, delay before checking
+                        if (self.pinsIn[pin_flag]):
+                            print(f"pin {pin_flag} is already in")
+                            # To be done: prevent re-check if pin remains in
+                            # after a wiggle
+                            # self.wiggleTimer.start(1000)
+                            self.wiggleDetected.emit()
+
+                        else: # pin is not in, new event
+                            # do standard check
+                            self.just_checked = True
+                            # self.pinFlag = pin_flag
+                            # self.plugEventDetected.emit(f"idxInfo:  {pin_flag}")
+                            # The following signal starts a timer that will continue
+                            # the check. This provides bounce protection
+                            # This signal is separate from the main python event loop
+                            self.plugEventDetected.emit()
+
                 else:
                     print("got to interupt 12 or greater")
                     self.startPressed.emit()
@@ -189,17 +202,10 @@ class MainWindow(qtw.QMainWindow):
                 self.whichLinePlugging = 1
             print("--- on: " + str(self.whichLinePlugging))
 
-
-
-
             # Send plugin info to model.py
             # Send key value object or duple, or array w two ints
             # self.plugInToHandle.emit(f"plugin - pin: {self.pinFlag}, line: {self.whichLinePlugging}")
             self.plugInToHandle.emit({"personIdx": self.pinFlag, "lineIdx": self.whichLinePlugging})
-
-
-
-
 
             # Set pin in
             self.pinsIn[self.pinFlag] = True
@@ -282,6 +288,20 @@ class MainWindow(qtw.QMainWindow):
     def delayedFinishCheck(self):
         print("delayed finished check \n")
         self.just_checked = False
+
+    def checkWiggle(self):
+        print("got to checkWiggle")
+        self.wiggleTimer.stop()
+        # Check whether the pin still grounded
+        # if no longer grounded, proceed with event detection
+        if (not self.pins[self.pinFlag].value == False):
+            # The pin is no longer in
+            self.just_checked = True
+            self.plugEventDetected.emit()
+        # else:
+            # if still grounded 
+            # do nothing
+            # pin has been removed during pause
 
     def handleStart(self):
         """Just for startup
