@@ -1,5 +1,5 @@
 import sys
-import json
+# import json
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtCore as qtc
 
@@ -11,9 +11,6 @@ from RPi import GPIO
 from adafruit_mcp230xx.mcp23017 import MCP23017
 
 from model import Model
-
-contentJsonFile = open('conversations.json')
-contentPy = json.load(contentJsonFile)
 
 class MainWindow(qtw.QMainWindow): 
     # Almost all of this should be in separate module analogous to svelte Panel
@@ -221,38 +218,19 @@ class MainWindow(qtw.QMainWindow):
                 # Also in model
                 self.whichLineInUse = self.whichLinePlugging
 
-                # # start incoming request
-                # self.incoming = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
-                # self.incoming.play()
-
                 # # turn this LED on
                 self.pinsLed[self.pinFlag].value = True
-
-                # Send msg to screen
-                # self.label.setText("Hi.  72 please.")
-                # self.label.setText(content.charlieHello())
-
-                # self.label.setText(contentPy[0]["helloText"])
 
                 print("in control: Connected to {} ".format(self.names[self.pinFlag]))
 
             elif self.pinFlag == 6:
                 # stop incoming request
-                print("Connected to {}  \n".format(self.names[self.pinFlag]))
+                print("in control, Connected to {}  \n".format(self.names[self.pinFlag]))
 
                 if self.whichLinePlugging == self.whichLineInUse:
 
                     # # turn this LED on
                     self.pinsLed[self.pinFlag].value = True
-
-                    self.incoming.stop()
-                    self.outgoingTone = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
-                    self.outgoingTone.play()
-
-                    # Until I figure out a callback for when finished
-                    self.outgoingToneTimer.start(1000)
-
-                    self.label.setText(contentPy[0]["convoText"])
 
                 else:
                     print("wrong line")

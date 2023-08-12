@@ -1,8 +1,12 @@
 import sys
+import json
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtGui as qtg
 from PyQt5 import QtCore as qtc
 import vlc
+
+contentJsonFile = open('conversations.json')
+contentPy = json.load(contentJsonFile)
 
 class Model(qtc.QObject):
     """Main logic patterned after software proto
@@ -16,6 +20,10 @@ class Model(qtc.QObject):
 
         # The following possibly in veiw
         self.buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
+        self.outgoingTone = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
+        # Until I figure out a callback for when finished
+        self.outgoingToneTimer=qtc.QTimer()
+        self.outgoingToneTimer.timeout.connect(self.playConvo)
 
         self.whichLineInUse = -1
 
@@ -56,12 +64,38 @@ class Model(qtc.QObject):
 
 
             # self.label.setText(contentPy[0]["helloText"])
-            self.displayText.emit("Temp Charlie saying hello")
+            # self.displayText.emit("Temp Charlie saying hello")
+            self.displayText.emit(contentPy[0]["helloText"])
 
 
             # print("Connected to {}  \n".format(self.names[self.pinFlag]))
             print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
 
+        elif pluggedIdxInfo["personIdx"] == 6:
+            # stop incoming request
+            print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
+
+            if (self.whichLineInUse == pluggedIdxInfo["lineIdx"]):
+
+                # # turn this LED on
+                # self.pinsLed[self.pinFlag].value = True
+
+                # self.incoming.stop()
+                # self.handlePlugInphoneLines[pluggedIdxInfo["lineIdx"]].audioTrack.volume = 0;
+                self.phoneLines[pluggedIdxInfo["lineIdx"]].stop()
+
+                # self.outgoingTone = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
+                self.outgoingTone.play()
+
+                # Until I figure out a callback for when finished
+                self.outgoingToneTimer.start(1000)
+
+
+                # self.label.setText(contentPy[0]["convoText"])
+                self.displayText.emit(contentPy[0]["convoText"])
+
+            else:
+                print("wrong line")
 
 
 
@@ -86,3 +120,9 @@ class Model(qtc.QObject):
     def playHello(self, _currConvo, lineIndex):
         self.phoneLines[lineIndex] = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
         self.phoneLines[lineIndex].play()
+
+    def playConvo(self):
+        self.outgoingTone.stop()
+        self.outgoingToneTimer.stop()
+        self.convo = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/2-Charlie_Calls_Olive.mp3")
+        self.convo.play()
