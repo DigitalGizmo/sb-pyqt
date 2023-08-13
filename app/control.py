@@ -50,7 +50,7 @@ class MainWindow(qtw.QMainWindow):
         self.incoming = None
         self.outgoingTone = None
         self.convo = None
-        self.whichLineInUse = -1
+        # self.whichLineInUse = -1
         self.whichLinePlugging = -1
 
         # --- timers --- 
@@ -82,6 +82,8 @@ class MainWindow(qtw.QMainWindow):
         self.unPlugToHandle.connect(self.model.handleUnPlug)
 
         self.model.displayText.connect(self.setScreenLabel)
+        self.model.ledEvent.connect(self.setLED)
+
 
         # Initialize the I2C bus:
         i2c = busio.I2C(board.SCL, board.SDA)
@@ -208,32 +210,6 @@ class MainWindow(qtw.QMainWindow):
                 self.blinkTimer.stop()
             # Buzzer stop handled in model.
 
-            if self.pinFlag == 4:
-                """ Wow, lot's to do here
-                Can I keep splitting gpio here with logic in model?
-                Could signal from model to a slot here which does things
-                like turn the LED on
-                """
-                # track lines
-                # Also in model
-                self.whichLineInUse = self.whichLinePlugging
-
-                # # turn this LED on
-                self.pinsLed[self.pinFlag].value = True
-
-                print("in control: Connected to {} ".format(self.names[self.pinFlag]))
-
-            elif self.pinFlag == 6:
-                # stop incoming request
-                print("in control, Connected to {}  \n".format(self.names[self.pinFlag]))
-
-                if self.whichLinePlugging == self.whichLineInUse:
-
-                    # # turn this LED on
-                    self.pinsLed[self.pinFlag].value = True
-
-                else:
-                    print("wrong line")
 
         else: # pin flag True, still, or again, high
             # On unplug we can't tell which line electonicaly 
@@ -303,6 +279,9 @@ class MainWindow(qtw.QMainWindow):
 
     def setScreenLabel(self, msg):
         self.label.setText(msg)        
+
+    def setLED(self, flagIdx, onOrOff):
+        self.pinsLed[flagIdx].value = onOrOff        
 
 app = qtw.QApplication([])
 

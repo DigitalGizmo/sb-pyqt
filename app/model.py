@@ -12,6 +12,7 @@ class Model(qtc.QObject):
     """Main logic patterned after software proto
     """
     displayText = qtc.pyqtSignal(str)
+    ledEvent = qtc.pyqtSignal(int, bool)
     # self.buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
     # buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
 
@@ -37,52 +38,42 @@ class Model(qtc.QObject):
         ]
 
 
+    # def handlePlugIn(self, pluggedIdxInfo):
     def handlePlugIn(self, pluggedIdxInfo):
+        personIdx = pluggedIdxInfo['personIdx']
+        lineIdx = pluggedIdxInfo['lineIdx']
         """triggered by control.py
         """
-        print(f'handlePlugIn, pin: {pluggedIdxInfo["personIdx"]}, line: {pluggedIdxInfo["lineIdx"]}')
+        print(f'handlePlugIn, pin: {personIdx}, line: {lineIdx}')
         # Blinker handdles in control.py
         self.buzzer.stop()
 
-        if pluggedIdxInfo["personIdx"] == 4:
+        if personIdx == 4:
             """ Wow, lot's to do here
             """
             # track lines
-            self.whichLineInUse = pluggedIdxInfo["lineIdx"]
+            self.whichLineInUse = lineIdx
             # start incoming request
-
             self.playHello(0, self.whichLineInUse)
-            # self.incoming = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
-            # self.incoming.play()
-
             # # turn this LED on
-            # self.pinsLed[self.pinFlag].value = True
-
+            self.ledEvent.emit(personIdx, True)
             # Send msg to screen
-            # self.label.setText("Hi.  72 please.")
-            # self.label.setText(content.charlieHello())
-
-
-            # self.label.setText(contentPy[0]["helloText"])
-            # self.displayText.emit("Temp Charlie saying hello")
             self.displayText.emit(contentPy[0]["helloText"])
-
-
             # print("Connected to {}  \n".format(self.names[self.pinFlag]))
             print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
 
-        elif pluggedIdxInfo["personIdx"] == 6:
+        elif personIdx == 6:
             # stop incoming request
             print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
 
-            if (self.whichLineInUse == pluggedIdxInfo["lineIdx"]):
+            if (self.whichLineInUse == lineIdx):
 
                 # # turn this LED on
-                # self.pinsLed[self.pinFlag].value = True
+                self.ledEvent.emit(personIdx, True)
 
                 # self.incoming.stop()
                 # self.handlePlugInphoneLines[pluggedIdxInfo["lineIdx"]].audioTrack.volume = 0;
-                self.phoneLines[pluggedIdxInfo["lineIdx"]].stop()
+                self.phoneLines[lineIdx].stop()
 
                 # self.outgoingTone = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
                 self.outgoingTone.play()
