@@ -1,4 +1,4 @@
-import sys
+# import sys
 import json
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtGui as qtg
@@ -13,6 +13,8 @@ class Model(qtc.QObject):
     """
     displayText = qtc.pyqtSignal(str)
     ledEvent = qtc.pyqtSignal(int, bool)
+    blinkerStart = qtc.pyqtSignal(int)
+    blinkerStop = qtc.pyqtSignal()
     # self.buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
     # buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
 
@@ -45,8 +47,9 @@ class Model(qtc.QObject):
         """triggered by control.py
         """
         print(f'handlePlugIn, pin: {personIdx}, line: {lineIdx}')
-        # Blinker handdles in control.py
+        # Blinker handdled in control.py
         self.buzzer.stop()
+        self.blinkerStop.emit()
 
         if personIdx == 4:
             """ Wow, lot's to do here
@@ -105,6 +108,8 @@ class Model(qtc.QObject):
         # self.blinkTimer.start(1000)
         # self.pinsLed[4].value = not self.pinsLed[4].value
         # self.pinsLed[4].value = True
+
+        self.blinkerStart.emit(3)
 
         self.displayText.emit("Start text for screen-- Incoming")
 

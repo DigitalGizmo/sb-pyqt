@@ -37,11 +37,12 @@ class MainWindow(qtw.QMainWindow):
 
         self.model = Model()
 
-        self.count = 0
+        # self.count = 0
         # self.temp_window_count = 0
         # self.blinking = True
         self.just_checked = False
         self.pinFlag = 15
+        self.pinToBlink = 0
         self.startBounceOnChange = False
         self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
         self.names = ["Mina","one","two","three","Freeman","five","Olive","seven","eight","nine","ten","eleven","twelve","thirteen"]
@@ -63,26 +64,24 @@ class MainWindow(qtw.QMainWindow):
         self.wiggleTimer=qtc.QTimer()
         self.wiggleTimer.timeout.connect(self.checkWiggle)
 
-        # Until I figure out a callback for when finished
-        self.outgoingToneTimer=qtc.QTimer()
-        self.outgoingToneTimer.timeout.connect(self.playConvo)
-
-
         # Experiment with changed.connect
         # self.startUpTimer=QTimer()
         # self.startUpTimer.timeout.connect(self.continueCheckPin)  
            
         # Self (control) for gpio related, self.model for audio
         # Okay to connect to both
-        self.startPressed.connect(self.handleStart)
+        # self.startPressed.connect(self.handleStart)
         self.startPressed.connect(self.model.handleStart)
 
         self.plugEventDetected.connect(lambda: self.bounceTimer.start(1000))
         self.plugInToHandle.connect(self.model.handlePlugIn)
         self.unPlugToHandle.connect(self.model.handleUnPlug)
 
+        # Eventst from model.py
         self.model.displayText.connect(self.setScreenLabel)
         self.model.ledEvent.connect(self.setLED)
+        self.model.blinkerStart.connect(self.startBlinker)
+        self.model.blinkerStop.connect(self.stopBlinker)
 
 
         # Initialize the I2C bus:
@@ -172,9 +171,10 @@ class MainWindow(qtw.QMainWindow):
                             self.plugEventDetected.emit()
 
                 else:
-                    print("got to interupt 12 or greater")
-                    self.startPressed.emit()
-                    # if (pin_flag == 12):
+                    # print("got to interupt 12 or greater")
+                    if (pin_flag == 13 and self.pins[13].value == False):
+                        # if (self.pins[13].value == False):
+                        self.startPressed.emit()
                     # self.pinsLed[0].value = True
 
         GPIO.add_event_detect(interrupt, GPIO.BOTH, callback=checkPin, bouncetime=100)
@@ -193,23 +193,17 @@ class MainWindow(qtw.QMainWindow):
 
             # Determine which line
             self.whichLinePlugging = 0
-            print("Stereo (Ring) pin {} aledgedly now: {}".format(self.pinFlag, self.pinsRing[self.pinFlag].value))
+            # print("Stereo (Ring) pin {} aledgedly now: {}".format(self.pinFlag, self.pinsRing[self.pinFlag].value))
             if (self.pinsRing[self.pinFlag].value == True):
                 self.whichLinePlugging = 1
             print("--- on: " + str(self.whichLinePlugging))
-
-            # Send plugin info to model.py as a dict
-            self.plugInToHandle.emit({"personIdx": self.pinFlag, "lineIdx": self.whichLinePlugging})
 
             # Still have to do gpio related tasks here
             # Set pin in
             self.pinsIn[self.pinFlag] = True
 
-            # # stop flashing if on
-            if self.blinkTimer.isActive():
-                self.blinkTimer.stop()
-            # Buzzer stop handled in model.
-
+            # Send plugin info to model.py as a dict
+            self.plugInToHandle.emit({"personIdx": self.pinFlag, "lineIdx": self.whichLinePlugging})
 
         else: # pin flag True, still, or again, high
             # On unplug we can't tell which line electonicaly 
@@ -243,45 +237,33 @@ class MainWindow(qtw.QMainWindow):
 
     def checkWiggle(self):
         print("got to checkWiggle")
-
         self.wiggleTimer.stop()
-
-        
         # Check whether the pin still grounded
         # if no longer grounded, proceed with event detection
         if (not self.pins[self.pinFlag].value == False):
             # The pin is no longer in
             self.just_checked = True
             self.plugEventDetected.emit()
-        # else:
-            # if still grounded 
-            # do nothing
+        # else: still grounded -- do nothing
             # pin has been removed during pause
-
-    def handleStart(self):
-        """Just for startup
-        self.model.handleStart is called simultaneously -- for text
-        """
-        print("start up")
-        # self.model.handleStart handles sound
-        self.blinkTimer.start(600)
-        self.pinsLed[4].value = not self.pinsLed[4].value
-
-    def blinker(self):
-        # print("blinking")
-        self.pinsLed[4].value = not self.pinsLed[4].value
-        
-    def playConvo(self):
-        self.outgoingTone.stop()
-        self.outgoingToneTimer.stop()
-        self.convo = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/2-Charlie_Calls_Olive.mp3")
-        self.convo.play()
 
     def setScreenLabel(self, msg):
         self.label.setText(msg)        
 
     def setLED(self, flagIdx, onOrOff):
-        self.pinsLed[flagIdx].value = onOrOff        
+        self.pinsLed[flagIdx].value = onOrOff     
+
+    def blinker(self):
+        # print("blinking")
+        self.pinsLed[self.pinToBlink].value = not self.pinsLed[self.pinToBlink].value
+        
+    def startBlinker(self, personIdx):
+        self.pinToBlink = personIdx
+        self.blinkTimer.start(600)
+
+    def stopBlinker(self):
+        if self.blinkTimer.isActive():
+            self.blinkTimer.stop()
 
 app = qtw.QApplication([])
 
