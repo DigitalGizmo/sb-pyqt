@@ -13,6 +13,7 @@ class Model(qtc.QObject):
     """
     displayText = qtc.pyqtSignal(str)
     ledEvent = qtc.pyqtSignal(int, bool)
+    pinInEvent = qtc.pyqtSignal(int, bool)
     blinkerStart = qtc.pyqtSignal(int)
     blinkerStop = qtc.pyqtSignal()
     # self.buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
@@ -60,6 +61,8 @@ class Model(qtc.QObject):
             self.playHello(0, self.whichLineInUse)
             # # turn this LED on
             self.ledEvent.emit(personIdx, True)
+            # Set pinsIn True
+            self.pinInEvent.emit(personIdx, True)
             # Send msg to screen
             self.displayText.emit(contentPy[0]["helloText"])
             # print("Connected to {}  \n".format(self.names[self.pinFlag]))
@@ -70,47 +73,35 @@ class Model(qtc.QObject):
             print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
 
             if (self.whichLineInUse == lineIdx):
-
                 # # turn this LED on
                 self.ledEvent.emit(personIdx, True)
+                # Set pinsIn True
+                self.pinInEvent.emit(personIdx, True)
 
-                # self.incoming.stop()
-                # self.handlePlugInphoneLines[pluggedIdxInfo["lineIdx"]].audioTrack.volume = 0;
                 self.phoneLines[lineIdx].stop()
-
-                # self.outgoingTone = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
                 self.outgoingTone.play()
 
                 # Until I figure out a callback for when finished
                 self.outgoingToneTimer.start(1000)
 
-
-                # self.label.setText(contentPy[0]["convoText"])
                 self.displayText.emit(contentPy[0]["convoText"])
 
             else:
                 print("wrong line")
 
-
-
-    def handleUnPlug(self, pinIndex):
+    def handleUnPlug(self, personIdx):
         """ triggered by control.py
         """
-        print(f"handle unPlug: {pinIndex}")
-
+        print(f"handle unPlug: {personIdx}")
+        # Set pinIn False
+        self.pinInEvent.emit(personIdx, False)
 
     def handleStart(self):
         """Just for startup
         """
-        print("start up")
-
+        # print("start up")
         self.buzzer.play()
-        # self.blinkTimer.start(1000)
-        # self.pinsLed[4].value = not self.pinsLed[4].value
-        # self.pinsLed[4].value = True
-
         self.blinkerStart.emit(3)
-
         self.displayText.emit("Start text for screen-- Incoming")
 
     def playHello(self, _currConvo, lineIndex):

@@ -80,6 +80,7 @@ class MainWindow(qtw.QMainWindow):
         # Eventst from model.py
         self.model.displayText.connect(self.setScreenLabel)
         self.model.ledEvent.connect(self.setLED)
+        self.model.pinInEvent.connect(self.setPinsIn)
         self.model.blinkerStart.connect(self.startBlinker)
         self.model.blinkerStop.connect(self.stopBlinker)
 
@@ -189,39 +190,26 @@ class MainWindow(qtw.QMainWindow):
         if (self.pins[self.pinFlag].value == False): # grounded by cable
             """False/grouded, then this event is a plug-in
             """
-            print(f"Pin {self.pinFlag} is now connected")
-
             # Determine which line
             self.whichLinePlugging = 0
             # print("Stereo (Ring) pin {} aledgedly now: {}".format(self.pinFlag, self.pinsRing[self.pinFlag].value))
             if (self.pinsRing[self.pinFlag].value == True):
                 self.whichLinePlugging = 1
-            print("--- on: " + str(self.whichLinePlugging))
-
-            # Still have to do gpio related tasks here
-            # Set pin in
-            self.pinsIn[self.pinFlag] = True
-
-            # Send plugin info to model.py as a dict
+            print(f"Pin {self.pinFlag} connected on line {self.whichLinePlugging}")
+            # Send plugin info to model.py as a dict 
+            # Model uses signals for LED, text and pinsIn to set here
             self.plugInToHandle.emit({"personIdx": self.pinFlag, "lineIdx": self.whichLinePlugging})
-
         else: # pin flag True, still, or again, high
-            # On unplug we can't tell which line electonicaly 
-            # (diff in shaft is gone), so rely on pinsIn info
-            # self.unPlugToHandle.emit(f"unplug - pin: {self.pinFlag}")
-            self.unPlugToHandle.emit(self.pinFlag)
-
             # was this a legit unplug?
             if (self.pinsIn[self.pinFlag]): # was plugged in
-                # print("-- Pin {} has been disconnected \n".format(pin_flag-3))
-                print("-- {} has been disconnected \n".format(self.names[self.pinFlag]))
-                # debug message
-                # self.label.setText(" {} unplugged \n".format(self.names[self.pinFlag]))
+                # print(f"Pin {self.pinFlag} has been disconnected \n")
 
-                self.pinsIn[self.pinFlag] = False
+                # On unplug we can't tell which line electonicaly 
+                # (diff in shaft is gone), so rely on pinsIn info
+                self.unPlugToHandle.emit(self.pinFlag)
+                # Model handleUnPlug will set pinsIn false for this on
             else:
                 # self.label.setText("Illegitimate unplug from {}  \n".format(self.names[self.pinFlag]))
-
                 print("got to pin true (changed to high), but not pin in")
         
         # print("finished check \n")
@@ -249,6 +237,10 @@ class MainWindow(qtw.QMainWindow):
 
     def setScreenLabel(self, msg):
         self.label.setText(msg)        
+
+    def setPinsIn(self, pinIdx, isIn):
+        self.pinsIn[pinIdx] = isIn    
+        print(f"pins in idx {pinIdx} is {isIn}")    
 
     def setLED(self, flagIdx, onOrOff):
         self.pinsLed[flagIdx].value = onOrOff     
