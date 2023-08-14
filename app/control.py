@@ -45,7 +45,6 @@ class MainWindow(qtw.QMainWindow):
         self.pinToBlink = 0
         self.startBounceOnChange = False
         self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
-        self.names = ["Mina","one","two","three","Freeman","five","Olive","seven","eight","nine","ten","eleven","twelve","thirteen"]
 
         # ------ phone call logic------
         self.incoming = None
@@ -209,7 +208,6 @@ class MainWindow(qtw.QMainWindow):
                 self.unPlugToHandle.emit(self.pinFlag)
                 # Model handleUnPlug will set pinsIn false for this on
             else:
-                # self.label.setText("Illegitimate unplug from {}  \n".format(self.names[self.pinFlag]))
                 print("got to pin true (changed to high), but not pin in")
         
         # print("finished check \n")

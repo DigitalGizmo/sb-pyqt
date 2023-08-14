@@ -5,8 +5,10 @@ from PyQt5 import QtGui as qtg
 from PyQt5 import QtCore as qtc
 import vlc
 
-contentJsonFile = open('conversations.json')
-contentPy = json.load(contentJsonFile)
+conversationsJsonFile = open('conversations.json')
+conversations = json.load(conversationsJsonFile)
+personsJsonFile = open('persons.json')
+persons = json.load(personsJsonFile)
 
 class Model(qtc.QObject):
     """Main logic patterned after software proto
@@ -64,7 +66,7 @@ class Model(qtc.QObject):
             # Set pinsIn True
             self.pinInEvent.emit(personIdx, True)
             # Send msg to screen
-            self.displayText.emit(contentPy[0]["helloText"])
+            self.displayText.emit(conversations[0]["helloText"])
             # print("Connected to {}  \n".format(self.names[self.pinFlag]))
             print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
 
@@ -84,7 +86,7 @@ class Model(qtc.QObject):
                 # Until I figure out a callback for when finished
                 self.outgoingToneTimer.start(1000)
 
-                self.displayText.emit(contentPy[0]["convoText"])
+                self.displayText.emit(conversations[0]["convoText"])
 
             else:
                 print("wrong line")
