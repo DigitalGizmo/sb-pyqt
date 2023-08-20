@@ -44,7 +44,7 @@ class MainWindow(qtw.QMainWindow):
         self.pinFlag = 15
         self.pinToBlink = 0
         self.startBounceOnChange = False
-        self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
+        # self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
 
         # ------ phone call logic------
         self.incoming = None
@@ -79,7 +79,7 @@ class MainWindow(qtw.QMainWindow):
         # Eventst from model.py
         self.model.displayText.connect(self.setScreenLabel)
         self.model.ledEvent.connect(self.setLED)
-        self.model.pinInEvent.connect(self.setPinsIn)
+        # self.model.pinInEvent.connect(self.setPinsIn)
         self.model.blinkerStart.connect(self.startBlinker)
         self.model.blinkerStop.connect(self.stopBlinker)
 
@@ -155,9 +155,12 @@ class MainWindow(qtw.QMainWindow):
                     if (not self.just_checked):
                         self.pinFlag = pin_flag
 
+                        # print(f"pin {pin_flag} from model = {self.model.getPinsIn(pin_flag)}")
+
                         # If this pin is in, delay before checking
                         # to protect against inadvertent wiggle
-                        if (self.pinsIn[pin_flag]):
+                        # if (self.pinsIn[pin_flag]):
+                        if (self.model.getPinsIn(pin_flag)):
                             print(f"pin {pin_flag} is already in")
                             # This will trigger a pause
                             self.wiggleDetected.emit()
@@ -200,7 +203,8 @@ class MainWindow(qtw.QMainWindow):
             self.plugInToHandle.emit({"personIdx": self.pinFlag, "lineIdx": self.whichLinePlugging})
         else: # pin flag True, still, or again, high
             # was this a legit unplug?
-            if (self.pinsIn[self.pinFlag]): # was plugged in
+            # if (self.pinsIn[self.pinFlag]): # was plugged in
+            if (self.model.getPinsIn(self.pinFlag)):
                 # print(f"Pin {self.pinFlag} has been disconnected \n")
 
                 # On unplug we can't tell which line electonicaly 
@@ -236,9 +240,9 @@ class MainWindow(qtw.QMainWindow):
     def setScreenLabel(self, msg):
         self.label.setText(msg)        
 
-    def setPinsIn(self, pinIdx, isIn):
-        self.pinsIn[pinIdx] = isIn    
-        print(f"pins in idx {pinIdx} is {isIn}")    
+    # def setPinsIn(self, pinIdx, isIn):
+    #     self.pinsIn[pinIdx] = isIn    
+    #     print(f"pins in idx {pinIdx} is {isIn}")    
 
     def setLED(self, flagIdx, onOrOff):
         self.pinsLed[flagIdx].value = onOrOff     

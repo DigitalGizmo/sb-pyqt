@@ -15,14 +15,19 @@ class Model(qtc.QObject):
     """
     displayText = qtc.pyqtSignal(str)
     ledEvent = qtc.pyqtSignal(int, bool)
-    pinInEvent = qtc.pyqtSignal(int, bool)
+    # pinInEvent = qtc.pyqtSignal(int, bool)
     blinkerStart = qtc.pyqtSignal(int)
     blinkerStop = qtc.pyqtSignal()
     # self.buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
     # buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
+    # Put pinsIn here in model where it's used more often
+    # rather than in control which would require a lot of signaling.
+    pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
 
     def __init__(self):
         super().__init__()
+
+        # pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
 
         # The following possibly in veiw
         self.buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
@@ -42,6 +47,11 @@ class Model(qtc.QObject):
             }
         ]
 
+    def setPinsIn(self, pinIdx, pinVal):
+        self.pinsIn[pinIdx] = pinVal
+
+    def getPinsIn(self, pinIdx):
+        return self.pinsIn[pinIdx]
 
     # def handlePlugIn(self, pluggedIdxInfo):
     def handlePlugIn(self, pluggedIdxInfo):
@@ -63,8 +73,13 @@ class Model(qtc.QObject):
             self.playHello(0, self.whichLineInUse)
             # # turn this LED on
             self.ledEvent.emit(personIdx, True)
+
             # Set pinsIn True
-            self.pinInEvent.emit(personIdx, True)
+            # self.pinInEvent.emit(personIdx, True)
+
+            self.setPinsIn(personIdx, True)
+
+
             # Send msg to screen
             self.displayText.emit(conversations[0]["helloText"])
             # print("Connected to {}  \n".format(self.names[self.pinFlag]))
@@ -77,8 +92,10 @@ class Model(qtc.QObject):
             if (self.whichLineInUse == lineIdx):
                 # # turn this LED on
                 self.ledEvent.emit(personIdx, True)
+
                 # Set pinsIn True
-                self.pinInEvent.emit(personIdx, True)
+                # self.pinInEvent.emit(personIdx, True)
+                self.setPinsIn(personIdx, True)
 
                 self.phoneLines[lineIdx].stop()
                 self.outgoingTone.play()
@@ -96,7 +113,8 @@ class Model(qtc.QObject):
         """
         print(f"handle unPlug: {personIdx}")
         # Set pinIn False
-        self.pinInEvent.emit(personIdx, False)
+        # self.pinInEvent.emit(personIdx, False)
+        self.setPinsIn(personIdx, False)
 
     def handleStart(self):
         """Just for startup
