@@ -58,14 +58,14 @@ class Model(qtc.QObject):
 			"unPlugStatus": NO_UNPLUG_STATUS,
 			"caller": {"index": 99, "isPlugged": False},
 			"callee": {"index": 99, "isPlugged": False},
-            # "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+            "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
         },
         {
 			"isEngaged": False,
 			"unPlugStatus": NO_UNPLUG_STATUS,
 			"caller": {"index": 99, "isPlugged": False},
 			"callee": {"index": 99, "isPlugged": False},
-            # "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+            "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
         }
     ]
 
@@ -89,20 +89,18 @@ class Model(qtc.QObject):
 
     def initiateCall(self):
         if (self.currConvo < 9):
-            currCallerIndex =  conversations[self.currConvo]["caller"]["index"]
+            self.currCallerIndex =  conversations[self.currConvo]["caller"]["index"]
             # Set "target", person being called
-            currCalleeIndex = conversations[self.currConvo]["callee"]["index"]
+            self.currCalleeIndex = conversations[self.currConvo]["callee"]["index"]
             # This just rings the buzzer. Next action will
             # be when user plugs in a plug - in Panel.svelte drag end: handlePlugIn
             self.buzzTrack.play()
             # buzzTrack.volume = .6    
 
-            # persons[conversations[self.currConvo]["caller"]["index"]]["ledState"] = self.LED_BLINKING
-
             # self.blinkerStart.emit(3)
             self.blinkerStart.emit(conversations[self.currConvo]["caller"]["index"])
 
-            self.displayText.emit("Start text for screen-- Incoming")\
+            self.displayText.emit("Start text for screen-- Incoming")
             
             print('-- New call being initiated by: ' + 
                 persons[conversations[self.currConvo]["caller"]["index"]]["name"])
@@ -124,9 +122,9 @@ class Model(qtc.QObject):
         # print(f'handlePlugIn, pin: {personIdx}, line: {lineIdx}')
 
 
-        # Blinker handdled in control.py
-        self.buzzTrack.stop()
-        self.blinkerStop.emit()
+        # # Blinker handdled in control.py
+        # self.buzzTrack.stop()
+        # self.blinkerStop.emit()
 
         # if (not self.phoneLines[lineIdx]["caller"]["isPlugged"]):
         #     print(f"--- this line, not plugged")
@@ -135,67 +133,105 @@ class Model(qtc.QObject):
 		# Fresh plug-in -- aka caller not plugged
 		#*******/
 		# Is this new use of line -- caller has not been plugged in.
-
-        # if (not self.phoneLines[lineIdx]["caller"]["isPlugged"]):
-
-
-        if personIdx == 4:
-        # if (not self.phoneLines[lineIdx].caller.isPlugged): 
-            """ Wow, lot's to do here
-            """
-            # track lines
-            self.whichLineInUse = lineIdx
-            # start incoming request
-            self.playHello(0, self.whichLineInUse)
-            # # turn this LED on
-            self.ledEvent.emit(personIdx, True)
-            # Set pinsIn True
-            self.setPinsIn(personIdx, True)
-            # Send msg to screen
-            self.displayText.emit(conversations[0]["helloText"])
-            # print("Connected to {}  \n".format(self.names[self.pinFlag]))
-            print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
-
-        elif personIdx == 6:
-            # stop incoming request
-            print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
-
-            if (self.whichLineInUse == lineIdx):
+        if (not self.phoneLines[lineIdx]["caller"]["isPlugged"]):
+            # Did user plug into caller?
+            # if personIdx == 4:
+            if personIdx == self.currCallerIndex:
+            # if (not self.phoneLines[lineIdx].caller.isPlugged): 
+                """ Wow, lot's to do here
+                """
                 # # turn this LED on
                 self.ledEvent.emit(personIdx, True)
+
+                # Set this person's jack to plugged
+				# persons[personIdx].isPluggedJack = true;
                 # Set pinsIn True
                 self.setPinsIn(personIdx, True)
-                self.phoneLines[lineIdx].stop()
-                self.outgoingTone.play()
 
-                # Until I figure out a callback for when finished
-                self.outgoingToneTimer.start(1000)
+                # Set this line as having caller plugged
+                self.phoneLines[lineIdx]["caller"]["isPlugged"] = True
+                # Set identity of caller on this line
+                self.phoneLines[lineIdx]["caller"]["index"] = personIdx;				
+                # Set this line in use only we have gotten this success
+                self.whichLineInUse = lineIdx
 
-                self.displayText.emit(conversations[0]["convoText"])
+                # Blinker handdled in control.py
+                self.buzzTrack.stop()
+                self.blinkerStop.emit()
 
-            else:
-                print("wrong line")
+                # start incoming request
+                self.playHello(0, self.whichLineInUse)
+                # Send msg to screen
+                self.displayText.emit(conversations[0]["helloText"])
+                # print("Connected to {}  \n".format(self.names[self.pinFlag]))
+                print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
 
-        # else: # caller is plugged
+                #  Handle case where caller was unplugged
+                # if...
+
+
+
+
+
+
+            # elif personIdx == 6:
+            #     # stop incoming request
+            #     print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
+
+            #     if (self.whichLineInUse == lineIdx):
+            #         # # turn this LED on
+            #         self.ledEvent.emit(personIdx, True)
+            #         # Set pinsIn True
+            #         self.setPinsIn(personIdx, True)
+            #         self.phoneLines[lineIdx].stop()
+            #         self.outgoingTone.play()
+
+            #         # Until I figure out a callback for when finished
+            #         self.outgoingToneTimer.start(1000)
+
+            #         self.displayText.emit(conversations[0]["convoText"])
+
+
+
+        else: # caller is plugged
 			#********
 		    # Other end of the line -- caller is plugged, so this must be the other plug
 			#********/
 			# But first, make sure this is the line in use
-            print(f"Which line in use: {lineIdx}")
-            # if (lineIdx == self.whichLineInUse):
-			# 	# Whether or not this is correct callee -- turn LED on.
-            #     # # turn this LED on
-            #     self.ledEvent.emit(personIdx, True)
-            #     # Set pinsIn True
-            #     self.setPinsIn(personIdx, True)
-            #     self.phoneLines[lineIdx].stop()
-            #     self.outgoingTone.play()
+            # print(f"Which line in use: {lineIdx}")
+            if (lineIdx == self.whichLineInUse):
+				# Whether or not this is correct callee -- turn LED on.
+                # # turn this LED on
+                self.ledEvent.emit(personIdx, True)
+                # Set pinsIn True
+                self.setPinsIn(personIdx, True)
+				# Stop the hello operator track
+                self.phoneLines[lineIdx]["audioTrack"].stop()
+                # Set callee -- used by unPlug even if it's the wrong number
+                self.phoneLines[lineIdx]["callee"]["index"] = personIdx
 
-            #     # Until I figure out a callback for when finished
-            #     self.outgoingToneTimer.start(1000)
+                if (personIdx == self.currCalleeIndex): # Correct callee
+                    print(f"plugged into correct callee, idx: {personIdx}")
+                    # Set this line as engaged
+                    self.phoneLines[lineIdx]["isEngaged"] = True
+                    # Also set line callee plugged
+                    self.phoneLines[lineIdx]["callee"]["isPlugged"] = True
+                    # Silence incoming Hello/Request, if necessary
+                    self.phoneLines[lineIdx]["audioTrack"].stop()
 
-            #     self.displayText.emit(conversations[0]["convoText"])
 
+                    self.outgoingTone.play()
+                    # Until I figure out a callback for when finished
+                    self.outgoingToneTimer.start(1000)
+
+                    # Temp, hard-wired
+                    # self.playConvo()
+                    self.outgoingToneTimer.start(1000)
+
+                    self.displayText.emit(conversations[0]["convoText"])
+
+                else:
+                    print("wrong line")
         
 
     def handleUnPlug(self, personIdx):
@@ -216,8 +252,8 @@ class Model(qtc.QObject):
         # self.displayText.emit("Start text for screen-- Incoming")
 
     def playHello(self, _currConvo, lineIndex):
-        self.phoneLines[lineIndex] = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
-        self.phoneLines[lineIndex].play()
+        self.phoneLines[lineIndex]["audioTrack"] = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+        self.phoneLines[lineIndex]["audioTrack"].play()
 
     # def playConvo(self):
     def playConvo(self):
