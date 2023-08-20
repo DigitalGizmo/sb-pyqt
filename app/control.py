@@ -44,7 +44,6 @@ class MainWindow(qtw.QMainWindow):
         self.pinFlag = 15
         self.pinToBlink = 0
         self.startBounceOnChange = False
-        # self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
 
         # ------ phone call logic------
         self.incoming = None
@@ -239,10 +238,6 @@ class MainWindow(qtw.QMainWindow):
 
     def setScreenLabel(self, msg):
         self.label.setText(msg)        
-
-    # def setPinsIn(self, pinIdx, isIn):
-    #     self.pinsIn[pinIdx] = isIn    
-    #     print(f"pins in idx {pinIdx} is {isIn}")    
 
     def setLED(self, flagIdx, onOrOff):
         self.pinsLed[flagIdx].value = onOrOff     
