@@ -20,20 +20,20 @@ class Model(qtc.QObject):
     blinkerStop = qtc.pyqtSignal()
     # buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
     buzzTrack = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
+
     outgoingTone = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
+    
     # Put pinsIn here in model where it's used more often
     # rather than in control which would require a lot of signaling.
     pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
-    # # Until I figure out a callback for when finished
-    # outgoingToneTimer=qtc.QTimer()
-    # outgoingToneTimer.timeout.connect(self.playConvo)
 
-
-    currConvo = 0
+    currConvo = 1
     currCallerIndex = 0
     currCalleeIndex = 0
     whichLineInUse = -1
     prevLineInUse = -1
+
+    lineArgForConvo = 0
 
     callInitTimer = qtc.QTimer()
     # reconnectTimer = undefined
@@ -71,13 +71,12 @@ class Model(qtc.QObject):
 
 
     outgoingToneTimer=qtc.QTimer()
-    # outgoingToneTimer.timeout.connect(playConvo)
+    # outgoingToneTimer.timeout.connect(playConvo) -- in init
 
 
     def __init__(self):
         super().__init__()
         # # Until I figure out a callback for when finished
-        # self.outgoingToneTimer=qtc.QTimer()
         self.outgoingToneTimer.timeout.connect(self.playConvo)
 
     def setPinsIn(self, pinIdx, pinVal):
@@ -111,7 +110,25 @@ class Model(qtc.QObject):
             #     new Audio("https://dev.digitalgizmo.com/msm-ed/ed-assets/audio/FinishedActivity.mp3")
             #     phoneLines[0].audioTrack.play()
 
+    def playHello(self, _currConvo, lineIndex):
+        self.phoneLines[lineIndex]["audioTrack"] = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/" + 
+            conversations[self.currConvo]["helloFile"] + ".mp3")
+        self.phoneLines[lineIndex]["audioTrack"].play()
+        # Send msg to screen
+        self.displayText.emit(conversations[0]["helloText"])
 
+    # def playConvo(self):
+    def playConvo(self):
+        self.outgoingTone.stop()
+        self.outgoingToneTimer.stop()
+
+        self.phoneLines[self.lineArgForConvo]["audioTrack"] = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/" + 
+            conversations[self.currConvo]["convoFile"] + ".mp3")
+        self.phoneLines[self.lineArgForConvo]["audioTrack"].play()
+
+
+        # self.convo = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/2-Charlie_Calls_Olive.mp3")
+        # self.convo.play()
 
     # def handlePlugIn(self, pluggedIdxInfo):
     def handlePlugIn(self, pluggedIdxInfo):
@@ -121,17 +138,9 @@ class Model(qtc.QObject):
         lineIdx = pluggedIdxInfo['lineIdx']
         # print(f'handlePlugIn, pin: {personIdx}, line: {lineIdx}')
 
-
-        # # Blinker handdled in control.py
-        # self.buzzTrack.stop()
-        # self.blinkerStop.emit()
-
-        # if (not self.phoneLines[lineIdx]["caller"]["isPlugged"]):
-        #     print(f"--- this line, not plugged")
-
 		# ********
 		# Fresh plug-in -- aka caller not plugged
-		#*******/
+		# *******/
 		# Is this new use of line -- caller has not been plugged in.
         if (not self.phoneLines[lineIdx]["caller"]["isPlugged"]):
             # Did user plug into caller?
@@ -145,7 +154,6 @@ class Model(qtc.QObject):
 
                 # Set this person's jack to plugged
 				# persons[personIdx].isPluggedJack = true;
-                # Set pinsIn True
                 self.setPinsIn(personIdx, True)
 
                 # Set this line as having caller plugged
@@ -161,8 +169,9 @@ class Model(qtc.QObject):
 
                 # start incoming request
                 self.playHello(0, self.whichLineInUse)
-                # Send msg to screen
-                self.displayText.emit(conversations[0]["helloText"])
+
+                # # Send msg to screen
+                # self.displayText.emit(conversations[0]["helloText"])
                 # print("Connected to {}  \n".format(self.names[self.pinFlag]))
                 print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
 
@@ -171,25 +180,6 @@ class Model(qtc.QObject):
 
 
 
-
-
-
-            # elif personIdx == 6:
-            #     # stop incoming request
-            #     print(f"In Model: Connected to {pluggedIdxInfo['personIdx']}")
-
-            #     if (self.whichLineInUse == lineIdx):
-            #         # # turn this LED on
-            #         self.ledEvent.emit(personIdx, True)
-            #         # Set pinsIn True
-            #         self.setPinsIn(personIdx, True)
-            #         self.phoneLines[lineIdx].stop()
-            #         self.outgoingTone.play()
-
-            #         # Until I figure out a callback for when finished
-            #         self.outgoingToneTimer.start(1000)
-
-            #         self.displayText.emit(conversations[0]["convoText"])
 
 
 
@@ -222,11 +212,12 @@ class Model(qtc.QObject):
 
                     self.outgoingTone.play()
                     # Until I figure out a callback for when finished
-                    self.outgoingToneTimer.start(1000)
 
-                    # Temp, hard-wired
-                    # self.playConvo()
-                    self.outgoingToneTimer.start(1000)
+                    # Timer will playConvo
+                    # Don't think I can send
+                    # so to my chagrin, setting temp global
+                    self.lineArgForConvo = lineIdx
+                    self.outgoingToneTimer.start(2000)
 
                     self.displayText.emit(conversations[0]["convoText"])
 
@@ -251,13 +242,4 @@ class Model(qtc.QObject):
         # self.blinkerStart.emit(3)
         # self.displayText.emit("Start text for screen-- Incoming")
 
-    def playHello(self, _currConvo, lineIndex):
-        self.phoneLines[lineIndex]["audioTrack"] = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
-        self.phoneLines[lineIndex]["audioTrack"].play()
 
-    # def playConvo(self):
-    def playConvo(self):
-        self.outgoingTone.stop()
-        self.outgoingToneTimer.stop()
-        self.convo = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/2-Charlie_Calls_Olive.mp3")
-        self.convo.play()
