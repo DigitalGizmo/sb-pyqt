@@ -49,8 +49,9 @@ class Model(qtc.QObject):
     REPLUG_IN_PROGRESS = 3
     CALLER_UNPLUGGED = 5
 
-
-
+    vlcInstances = [vlc.Instance(), vlc.Instance()]
+    vlcPlayers = [vlcInstances[0].media_player_new(), vlcInstances[1].media_player_new()]
+    vlcEvents = [vlcPlayers[0].event_manager(), vlcPlayers[1].event_manager()]
 
     phoneLines = [
         {
@@ -115,18 +116,29 @@ class Model(qtc.QObject):
             conversations[self.currConvo]["helloFile"] + ".mp3")
         self.phoneLines[lineIndex]["audioTrack"].play()
         # Send msg to screen
-        self.displayText.emit(conversations[0]["helloText"])
+        self.displayText.emit(conversations[self.currConvo]["helloText"])
 
-    # In software proto playConvo was just the tone. It had a callback
+
     def playFullConvo(self):
+        """
+        In software proto playConvo was just the tone. It had a callback
+        Wish I could pass parameters, but this is called by timer
+        currConvo is already a global, lineArgForConvo is a global created for this purpose
+        """
         self.outgoingTone.stop()
         self.outgoingToneTimer.stop()
+        self.displayText.emit(conversations[self.currConvo]["convoText"])
 
-        self.phoneLines[self.lineArgForConvo]["audioTrack"] = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/" + 
+        # Simulate callback for convo track finish
+        self.vlcEvents[self.lineArgForConvo].event_attach(vlc.EventType.MediaPlayerEndReached, self.convoFinished)
+        media = self.vlcInstances[self.lineArgForConvo].media_new_path("/home/piswitch/Apps/sb-audio/" + 
             conversations[self.currConvo]["convoFile"] + ".mp3")
-        self.phoneLines[self.lineArgForConvo]["audioTrack"].play()
+        self.vlcPlayers[self.lineArgForConvo].set_media(media)
+        self.vlcPlayers[self.lineArgForConvo].play()
 
-        self.displayText.emit(conversations[0]["convoText"])
+    def convoFinished(self, event):
+        print("conversation finished")
+
 
     # def handlePlugIn(self, pluggedIdxInfo):
     def handlePlugIn(self, pluggedIdxInfo):
