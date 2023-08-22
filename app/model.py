@@ -71,13 +71,13 @@ class Model(qtc.QObject):
 
 
     outgoingToneTimer=qtc.QTimer()
-    # outgoingToneTimer.timeout.connect(playConvo) -- in init
+    # outgoingToneTimer.timeout.connect(playFullConvo) -- in init
 
 
     def __init__(self):
         super().__init__()
-        # # Until I figure out a callback for when finished
-        self.outgoingToneTimer.timeout.connect(self.playConvo)
+        # Play convo needs lineIndex & currConvo, both set (unfortunately) globally
+        self.outgoingToneTimer.timeout.connect(self.playFullConvo)
 
     def setPinsIn(self, pinIdx, pinVal):
         self.pinsIn[pinIdx] = pinVal
@@ -117,8 +117,8 @@ class Model(qtc.QObject):
         # Send msg to screen
         self.displayText.emit(conversations[0]["helloText"])
 
-    # def playConvo(self):
-    def playConvo(self):
+    # In software proto playConvo was just the tone. It had a callback
+    def playFullConvo(self):
         self.outgoingTone.stop()
         self.outgoingToneTimer.stop()
 
@@ -126,9 +126,7 @@ class Model(qtc.QObject):
             conversations[self.currConvo]["convoFile"] + ".mp3")
         self.phoneLines[self.lineArgForConvo]["audioTrack"].play()
 
-
-        # self.convo = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/2-Charlie_Calls_Olive.mp3")
-        # self.convo.play()
+        self.displayText.emit(conversations[0]["convoText"])
 
     # def handlePlugIn(self, pluggedIdxInfo):
     def handlePlugIn(self, pluggedIdxInfo):
@@ -209,17 +207,14 @@ class Model(qtc.QObject):
                     # Silence incoming Hello/Request, if necessary
                     self.phoneLines[lineIdx]["audioTrack"].stop()
 
-
                     self.outgoingTone.play()
-                    # Until I figure out a callback for when finished
-
-                    # Timer will playConvo
+                    # Timer will playFullConvo
                     # Don't think I can send
                     # so to my chagrin, setting temp global
                     self.lineArgForConvo = lineIdx
                     self.outgoingToneTimer.start(2000)
 
-                    self.displayText.emit(conversations[0]["convoText"])
+                    # self.displayText.emit(conversations[0]["convoText"])
 
                 else:
                     print("wrong line")
