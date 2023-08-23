@@ -18,10 +18,6 @@ class Model(qtc.QObject):
     # pinInEvent = qtc.pyqtSignal(int, bool)
     blinkerStart = qtc.pyqtSignal(int)
     blinkerStop = qtc.pyqtSignal()
-    # buzzer = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
-    buzzTrack = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
-
-    outgoingTone = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
     
     # Put pinsIn here in model where it's used more often
     # rather than in control which would require a lot of signaling.
@@ -48,6 +44,15 @@ class Model(qtc.QObject):
     DURING_INTERRUPT_SILENCE = 2
     REPLUG_IN_PROGRESS = 3
     CALLER_UNPLUGGED = 5
+
+    buzzTrack = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
+
+    toneInstace = vlc.Instance()
+    tonePlayer = toneInstace.media_player_new()
+    toneEvents = tonePlayer.event_manager()
+
+    outgoingTone = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
+
 
     vlcInstances = [vlc.Instance(), vlc.Instance()]
     vlcPlayers = [vlcInstances[0].media_player_new(), vlcInstances[1].media_player_new()]
@@ -119,7 +124,19 @@ class Model(qtc.QObject):
         self.displayText.emit(conversations[self.currConvo]["helloText"])
 
 
-    def playFullConvo(self):
+    def playConvo(self, currConvo, lineIndex):
+        """
+        This just plays the outgoing tone and then starts the full convo
+        """
+
+        # Long VLC way of creating callback
+        self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
+            self.setCallCompleted) # playFullConvo(currConvo, lineIndex)
+        media = self.toneInstace.media_new_path("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
+        self.tonePlayer.set_media(media)
+        self.tonePlayer.play()
+
+    def playFullConvo(self, currConvo, lineIndex):
         """
         In software proto playConvo was just the tone. It had a callback
         Wish I could pass parameters, but this is called by timer
@@ -127,16 +144,18 @@ class Model(qtc.QObject):
         """
         self.outgoingTone.stop()
         self.outgoingToneTimer.stop()
-        self.displayText.emit(conversations[self.currConvo]["convoText"])
+        self.displayText.emit(conversations[currConvo]["convoText"])
 
         # Simulate callback for convo track finish
-        self.vlcEvents[self.lineArgForConvo].event_attach(vlc.EventType.MediaPlayerEndReached, self.convoFinished)
-        media = self.vlcInstances[self.lineArgForConvo].media_new_path("/home/piswitch/Apps/sb-audio/" + 
+        # self.vlcEvents[self.lineArgForConvo].event_attach(vlc.EventType.MediaPlayerEndReached, self.convoFinished)
+        self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
+            self.setCallCompleted) # setCallCompleted(lineIndex)
+        media = self.toneInstace.media_new_path("/home/piswitch/Apps/sb-audio/" + 
             conversations[self.currConvo]["convoFile"] + ".mp3")
-        self.vlcPlayers[self.lineArgForConvo].set_media(media)
-        self.vlcPlayers[self.lineArgForConvo].play()
+        self.tonePlayer.set_media(media)
+        self.tonePlayer.play()
 
-    def convoFinished(self, event):
+    def setCallCompleted(self, event):
         print("conversation finished")
 
 
@@ -219,12 +238,16 @@ class Model(qtc.QObject):
                     # Silence incoming Hello/Request, if necessary
                     self.phoneLines[lineIdx]["audioTrack"].stop()
 
-                    self.outgoingTone.play()
-                    # Timer will playFullConvo
-                    # Don't think I can send
-                    # so to my chagrin, setting temp global
-                    self.lineArgForConvo = lineIdx
-                    self.outgoingToneTimer.start(2000)
+
+                    self.playConvo(self.currConvo,	lineIdx)
+
+
+                    # self.outgoingTone.play()
+                    # # Timer will playFullConvo
+                    # # Don't think I can send
+                    # # so to my chagrin, setting temp global
+                    # self.lineArgForConvo = lineIdx
+                    # self.outgoingToneTimer.start(2000)
 
                     # self.displayText.emit(conversations[0]["convoText"])
 
