@@ -131,32 +131,40 @@ class Model(qtc.QObject):
 
         # Long VLC way of creating callback
         self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
-            self.setCallCompleted) # playFullConvo(currConvo, lineIndex)
+            self.playFullConvo, currConvo, lineIndex) # playFullConvo(currConvo, lineIndex)
+        
+
         media = self.toneInstace.media_new_path("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
         self.tonePlayer.set_media(media)
         self.tonePlayer.play()
 
-    def playFullConvo(self, currConvo, lineIndex):
+    def playFullConvo(self, event, _currConvo, lineIndex):
         """
         In software proto playConvo was just the tone. It had a callback
         Wish I could pass parameters, but this is called by timer
         currConvo is already a global, lineArgForConvo is a global created for this purpose
         """
-        self.outgoingTone.stop()
-        self.outgoingToneTimer.stop()
-        self.displayText.emit(conversations[currConvo]["convoText"])
+        # print(f"fullconvo, convo: {_currConvo}, linedx: {lineIndex}, dummy: {dummy}")
+
+
+        # self.outgoingTone.stop()
+        # self.outgoingToneTimer.stop()
+        self.displayText.emit(conversations[_currConvo]["convoText"])
 
         # Simulate callback for convo track finish
-        # self.vlcEvents[self.lineArgForConvo].event_attach(vlc.EventType.MediaPlayerEndReached, self.convoFinished)
-        self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
-            self.setCallCompleted) # setCallCompleted(lineIndex)
-        media = self.toneInstace.media_new_path("/home/piswitch/Apps/sb-audio/" + 
-            conversations[self.currConvo]["convoFile"] + ".mp3")
-        self.tonePlayer.set_media(media)
-        self.tonePlayer.play()
+        self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
+            self.setCallCompleted, _currConvo, lineIndex)
 
-    def setCallCompleted(self, event):
+        media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
+            conversations[_currConvo]["convoFile"] + ".mp3")
+
+        self.vlcPlayers[lineIndex].set_media(media)
+        self.vlcPlayers[lineIndex].play()
+
+
+    def setCallCompleted(self, event, _currConvo, lineIndex): #, _currConvo, lineIndex
         print("conversation finished")
+        print(f"fullconvo, convo: {_currConvo}, linedx: {lineIndex}")
 
 
     # def handlePlugIn(self, pluggedIdxInfo):
