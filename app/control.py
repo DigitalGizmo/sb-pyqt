@@ -46,9 +46,9 @@ class MainWindow(qtw.QMainWindow):
         self.startBounceOnChange = False
 
         # ------ phone call logic------
-        self.incoming = None
-        self.outgoingTone = None
-        self.convo = None
+        # self.incoming = None
+        # self.outgoingTone = None
+        # self.convo = None
         # self.whichLineInUse = -1
         self.whichLinePlugging = -1
 
@@ -67,9 +67,8 @@ class MainWindow(qtw.QMainWindow):
         # self.startUpTimer.timeout.connect(self.continueCheckPin)  
            
         # Self (control) for gpio related, self.model for audio
-        # Okay to connect to both
-        # self.startPressed.connect(self.handleStart)
-        self.startPressed.connect(self.model.handleStart)
+        self.startPressed.connect(self.startReset)
+        # self.startPressed.connect(self.model.handleStart)
 
         self.plugEventDetected.connect(lambda: self.bounceTimer.start(1000))
         self.plugInToHandle.connect(self.model.handlePlugIn)
@@ -253,6 +252,11 @@ class MainWindow(qtw.QMainWindow):
     def stopBlinker(self):
         if self.blinkTimer.isActive():
             self.blinkTimer.stop()
+
+    def startReset(self):
+        print("reseting, starting")
+        # __init__(self)
+        self.model.handleStart()
 
 app = qtw.QApplication([])
 

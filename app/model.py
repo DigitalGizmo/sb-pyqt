@@ -18,72 +18,59 @@ class Model(qtc.QObject):
     # pinInEvent = qtc.pyqtSignal(int, bool)
     blinkerStart = qtc.pyqtSignal(int)
     blinkerStop = qtc.pyqtSignal()
-    
-    # Put pinsIn here in model where it's used more often
-    # rather than in control which would require a lot of signaling.
-    pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
-
-    currConvo = 1
-    currCallerIndex = 0
-    currCalleeIndex = 0
-    whichLineInUse = -1
-    prevLineInUse = -1
-
-    lineArgForConvo = 0
-
-    callInitTimer = qtc.QTimer()
-    # reconnectTimer = undefined
-    audioCaption = " "
-
-    LED_OFF = 0
-    LED_BLINKING = 1
-    LED_SOLID = 2
-
-    NO_UNPLUG_STATUS = 0
-    AWAITING_INTERRUPT = 1
-    DURING_INTERRUPT_SILENCE = 2
-    REPLUG_IN_PROGRESS = 3
-    CALLER_UNPLUGGED = 5
-
-    buzzTrack = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
 
     toneInstace = vlc.Instance()
     tonePlayer = toneInstace.media_player_new()
     toneEvents = tonePlayer.event_manager()
 
-    outgoingTone = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
-
-
     vlcInstances = [vlc.Instance(), vlc.Instance()]
     vlcPlayers = [vlcInstances[0].media_player_new(), vlcInstances[1].media_player_new()]
     vlcEvents = [vlcPlayers[0].event_manager(), vlcPlayers[1].event_manager()]
 
-    phoneLines = [
-        {
-			"isEngaged": False,
-			"unPlugStatus": NO_UNPLUG_STATUS,
-			"caller": {"index": 99, "isPlugged": False},
-			"callee": {"index": 99, "isPlugged": False},
-            "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
-        },
-        {
-			"isEngaged": False,
-			"unPlugStatus": NO_UNPLUG_STATUS,
-			"caller": {"index": 99, "isPlugged": False},
-			"callee": {"index": 99, "isPlugged": False},
-            "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
-        }
-    ]
+    buzzTrack = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
 
-
-    outgoingToneTimer=qtc.QTimer()
-    # outgoingToneTimer.timeout.connect(playFullConvo) -- in init
 
 
     def __init__(self):
         super().__init__()
-        # Play convo needs lineIndex & currConvo, both set (unfortunately) globally
-        self.outgoingToneTimer.timeout.connect(self.playFullConvo)
+        # self.outgoingToneTimer.timeout.connect(self.playFullConvo)
+
+        # Put pinsIn here in model where it's used more often
+        # rather than in control which would require a lot of signaling.
+        self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
+        self.currConvo = 1
+        self.currCallerIndex = 0
+        self.currCalleeIndex = 0
+        self.whichLineInUse = -1
+        self.prevLineInUse = -1
+        # lineArgForConvo = 0
+        self.callInitTimer = qtc.QTimer()
+        # reconnectTimer = undefined
+        audioCaption = " "
+
+        self.NO_UNPLUG_STATUS = 0
+        self.AWAITING_INTERRUPT = 1
+        self.DURING_INTERRUPT_SILENCE = 2
+        self.REPLUG_IN_PROGRESS = 3
+        self.CALLER_UNPLUGGED = 5
+
+        self.phoneLines = [
+            {
+                "isEngaged": False,
+                "unPlugStatus": self.NO_UNPLUG_STATUS,
+                "caller": {"index": 99, "isPlugged": False},
+                "callee": {"index": 99, "isPlugged": False},
+                "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+            },
+            {
+                "isEngaged": False,
+                "unPlugStatus": self.NO_UNPLUG_STATUS,
+                "caller": {"index": 99, "isPlugged": False},
+                "callee": {"index": 99, "isPlugged": False},
+                "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+            }
+        ]
+
 
     def setPinsIn(self, pinIdx, pinVal):
         self.pinsIn[pinIdx] = pinVal
