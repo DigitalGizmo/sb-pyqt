@@ -29,7 +29,7 @@ class MainWindow(qtw.QMainWindow):
         self.setWindowTitle("You Are the Operator")
         self.label = qtw.QLabel(self)
         self.label.setWordWrap(True)
-        self.label.setText("Keep your ears open for incoming calls! ")
+        # self.label.setText("Keep your ears open for incoming calls! ")
         self.label.setAlignment(qtc.Qt.AlignTop)
         # self.label.setStyleSheet("vertical-align: top;")
         self.setGeometry(20,120,600,200)
@@ -37,13 +37,7 @@ class MainWindow(qtw.QMainWindow):
 
         self.model = Model()
 
-        # self.count = 0
-        # self.temp_window_count = 0
-        # self.blinking = True
-        self.just_checked = False
-        self.pinFlag = 15
-        self.pinToBlink = 0
-        self.startBounceOnChange = False
+        # self.startBounceOnChange = False
 
         # ------ phone call logic------
         # self.incoming = None
@@ -93,30 +87,30 @@ class MainWindow(qtw.QMainWindow):
         self.pins = []
         for pinIndex in range(0, 16):
             self.pins.append(self.mcp.get_pin(pinIndex))
-        # Set to input - later will get intrrupt as well
-        for pinIndex in range(0, 16):
-            self.pins[pinIndex].direction = Direction.INPUT
-            self.pins[pinIndex].pull = Pull.UP
+        # # Set to input - later will get intrrupt as well
+        # for pinIndex in range(0, 16):
+        #     self.pins[pinIndex].direction = Direction.INPUT
+        #     self.pins[pinIndex].pull = Pull.UP
 
         # Stereo "ring" which will detect 1st vs 2nd line
         self.pinsRing = []
         for pinIndex in range(0, 12):
             self.pinsRing.append(self.mcpRing.get_pin(pinIndex))
-        # Set to input
-        for pinIndex in range(0, 12):
-            self.pinsRing[pinIndex].direction = Direction.INPUT
-            self.pinsRing[pinIndex].pull = Pull.UP
+        # # Set to input
+        # for pinIndex in range(0, 12):
+        #     self.pinsRing[pinIndex].direction = Direction.INPUT
+        #     self.pinsRing[pinIndex].pull = Pull.UP
 
-        # pinsLed are in model.py
         # LEDs 
         # Tried to put these in the Model/logic module -- but seems all gpio
         # needs to be in this base/main module
         self.pinsLed = []
         for pinIndex in range(0, 12):
             self.pinsLed.append(self.mcpLed.get_pin(pinIndex))
-        # Set to output
-        for pinIndex in range(0, 12):
-           self.pinsLed[pinIndex].switch_to_output(value=False)
+        # In Reset
+        # # Set to output
+        # for pinIndex in range(0, 12):
+        #    self.pinsLed[pinIndex].switch_to_output(value=False)
 
         # -- Set up Tip interrupt --
         self.mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
@@ -128,7 +122,11 @@ class MainWindow(qtw.QMainWindow):
         self.mcp.interrupt_configuration = 0x0000  # interrupt on any change
         self.mcp.io_control = 0x44  # Interrupt as open drain and mirrored
         # put this in startup?
+
         self.mcp.clear_ints()  # Interrupts need to be cleared initially
+
+
+        self.reset()
 
         # connect either interrupt pin to the Raspberry pi's pin 17.
         # They were previously configured as mirrored.
@@ -179,6 +177,35 @@ class MainWindow(qtw.QMainWindow):
                     # self.pinsLed[0].value = True
 
         GPIO.add_event_detect(interrupt, GPIO.BOTH, callback=checkPin, bouncetime=100)
+
+    def reset(self):
+        self.label.setText("Keep your ears open for incoming calls! ")
+        self.just_checked = False
+        self.pinFlag = 15
+        self.pinToBlink = 0
+
+        # Set to input - later will get intrrupt as well
+        for pinIndex in range(0, 16):
+            self.pins[pinIndex].direction = Direction.INPUT
+            self.pins[pinIndex].pull = Pull.UP
+
+        # Set to input
+        for pinIndex in range(0, 12):
+            self.pinsRing[pinIndex].direction = Direction.INPUT
+            self.pinsRing[pinIndex].pull = Pull.UP
+
+        # Set to output
+        for pinIndex in range(0, 12):
+           self.pinsLed[pinIndex].switch_to_output(value=False)
+
+        self.mcp.clear_ints()  # Interrupts need to be cleared initially
+
+        if self.bounceTimer.isActive():
+            self.bounceTimer.stop()
+        if self.blinkTimer.isActive():
+            self.blinkTimer.stop()            
+        if self.wiggleTimer.isActive():
+            self.wiggleTimer.stop()            
 
     def continueCheckPin(self):
         # Not able to send param through timer, so pinFlag has been set globaly
@@ -255,7 +282,7 @@ class MainWindow(qtw.QMainWindow):
 
     def startReset(self):
         print("reseting, starting")
-        # __init__(self)
+        self.reset()
         self.model.handleStart()
 
 app = qtw.QApplication([])

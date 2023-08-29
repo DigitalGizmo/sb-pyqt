@@ -35,6 +35,49 @@ class Model(qtc.QObject):
         super().__init__()
         # self.outgoingToneTimer.timeout.connect(self.playFullConvo)
 
+        # # Put pinsIn here in model where it's used more often
+        # # rather than in control which would require a lot of signaling.
+        # self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
+        # self.currConvo = 1
+        # self.currCallerIndex = 0
+        # self.currCalleeIndex = 0
+        # self.whichLineInUse = -1
+        # self.prevLineInUse = -1
+        # lineArgForConvo = 0
+        self.callInitTimer = qtc.QTimer()
+        # reconnectTimer = undefined
+        audioCaption = " "
+
+        # self.NO_UNPLUG_STATUS = 0
+        # self.AWAITING_INTERRUPT = 1
+        # self.DURING_INTERRUPT_SILENCE = 2
+        # self.REPLUG_IN_PROGRESS = 3
+        # self.CALLER_UNPLUGGED = 5
+
+        # self.phoneLines = [
+        #     {
+        #         "isEngaged": False,
+        #         "unPlugStatus": self.NO_UNPLUG_STATUS,
+        #         "caller": {"index": 99, "isPlugged": False},
+        #         "callee": {"index": 99, "isPlugged": False},
+        #         "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+        #     },
+        #     {
+        #         "isEngaged": False,
+        #         "unPlugStatus": self.NO_UNPLUG_STATUS,
+        #         "caller": {"index": 99, "isPlugged": False},
+        #         "callee": {"index": 99, "isPlugged": False},
+        #         "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+        #     }
+        # ]
+
+    def reset(self):
+        if self.callInitTimer.isActive():
+            self.callInitTimer.stop()
+
+        self.vlcPlayers[0].stop()
+        self.vlcPlayers[1].stop()
+
         # Put pinsIn here in model where it's used more often
         # rather than in control which would require a lot of signaling.
         self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
@@ -43,10 +86,7 @@ class Model(qtc.QObject):
         self.currCalleeIndex = 0
         self.whichLineInUse = -1
         self.prevLineInUse = -1
-        # lineArgForConvo = 0
-        self.callInitTimer = qtc.QTimer()
-        # reconnectTimer = undefined
-        audioCaption = " "
+
 
         self.NO_UNPLUG_STATUS = 0
         self.AWAITING_INTERRUPT = 1
@@ -71,6 +111,8 @@ class Model(qtc.QObject):
             }
         ]
 
+        self.phoneLines[0]["audioTrack"].stop()
+        self.phoneLines[1]["audioTrack"].stop()
 
     def setPinsIn(self, pinIdx, pinVal):
         self.pinsIn[pinIdx] = pinVal
@@ -261,6 +303,7 @@ class Model(qtc.QObject):
     def handleStart(self):
         """Just for startup
         """
+        self.reset()
         self.initiateCall()
         # # print("start up")
         # self.buzzer.play()
