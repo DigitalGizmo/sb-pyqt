@@ -52,7 +52,7 @@ class MainWindow(qtw.QMainWindow):
         self.blinkTimer=qtc.QTimer()
         self.blinkTimer.timeout.connect(self.blinker)
         # Supress interrupt when plug is just wiggled
-        self.wiggleDetected.connect(lambda: self.wiggleTimer.start(1000))
+        self.wiggleDetected.connect(lambda: self.wiggleTimer.start(700))
         self.wiggleTimer=qtc.QTimer()
         self.wiggleTimer.timeout.connect(self.checkWiggle)
 

@@ -29,54 +29,17 @@ class Model(qtc.QObject):
 
     buzzTrack = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
 
-
-
     def __init__(self):
         super().__init__()
-        # self.outgoingToneTimer.timeout.connect(self.playFullConvo)
-
-        # # Put pinsIn here in model where it's used more often
-        # # rather than in control which would require a lot of signaling.
-        # self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
-        # self.currConvo = 1
-        # self.currCallerIndex = 0
-        # self.currCalleeIndex = 0
-        # self.whichLineInUse = -1
-        # self.prevLineInUse = -1
-        # lineArgForConvo = 0
         self.callInitTimer = qtc.QTimer()
+        self.callInitTimer.setSingleShot(True)
+        self.callInitTimer.timeout.connect(self.initiateCall)
         # reconnectTimer = undefined
-        audioCaption = " "
-
-        # self.NO_UNPLUG_STATUS = 0
-        # self.AWAITING_INTERRUPT = 1
-        # self.DURING_INTERRUPT_SILENCE = 2
-        # self.REPLUG_IN_PROGRESS = 3
-        # self.CALLER_UNPLUGGED = 5
-
-        # self.phoneLines = [
-        #     {
-        #         "isEngaged": False,
-        #         "unPlugStatus": self.NO_UNPLUG_STATUS,
-        #         "caller": {"index": 99, "isPlugged": False},
-        #         "callee": {"index": 99, "isPlugged": False},
-        #         "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
-        #     },
-        #     {
-        #         "isEngaged": False,
-        #         "unPlugStatus": self.NO_UNPLUG_STATUS,
-        #         "caller": {"index": 99, "isPlugged": False},
-        #         "callee": {"index": 99, "isPlugged": False},
-        #         "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
-        #     }
-        # ]
+        # audioCaption = " "
+        self.reset()
 
     def reset(self):
-        if self.callInitTimer.isActive():
-            self.callInitTimer.stop()
-
-        self.vlcPlayers[0].stop()
-        self.vlcPlayers[1].stop()
+        self.stopAllAudio()
 
         # Put pinsIn here in model where it's used more often
         # rather than in control which would require a lot of signaling.
@@ -111,8 +74,14 @@ class Model(qtc.QObject):
             }
         ]
 
-        self.phoneLines[0]["audioTrack"].stop()
-        self.phoneLines[1]["audioTrack"].stop()
+    def stopAllAudio(self):
+        if self.callInitTimer.isActive():
+            self.callInitTimer.stop()
+
+        self.vlcPlayers[0].stop()
+        self.vlcPlayers[1].stop()
+        self.tonePlayer.stop()
+
 
     def setPinsIn(self, pinIdx, pinVal):
         self.pinsIn[pinIdx] = pinVal
@@ -146,9 +115,11 @@ class Model(qtc.QObject):
             #     phoneLines[0].audioTrack.play()
 
     def playHello(self, _currConvo, lineIndex):
-        self.phoneLines[lineIndex]["audioTrack"] = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/" + 
-            conversations[self.currConvo]["helloFile"] + ".mp3")
-        self.phoneLines[lineIndex]["audioTrack"].play()
+        media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
+            conversations[_currConvo]["helloFile"] + ".mp3")
+        self.vlcPlayers[lineIndex].set_media(media)
+        self.vlcPlayers[lineIndex].play()
+
         # Send msg to screen
         self.displayText.emit(conversations[self.currConvo]["helloText"])
 
@@ -230,6 +201,7 @@ class Model(qtc.QObject):
                 self.whichLineInUse = lineIdx
 
                 # Blinker handdled in control.py
+                print("stopping buzz track?")
                 self.buzzTrack.stop()
                 self.blinkerStop.emit()
 
@@ -262,7 +234,13 @@ class Model(qtc.QObject):
                 # Set pinsIn True
                 self.setPinsIn(personIdx, True)
 				# Stop the hello operator track
-                self.phoneLines[lineIdx]["audioTrack"].stop()
+                # self.phoneLines[lineIdx]["audioTrack"].stop()
+
+                # Silence incoming Hello/Request, whether this is the correct
+                # callee or not
+                self.vlcPlayers[lineIdx].stop()
+
+
                 # Set callee -- used by unPlug even if it's the wrong number
                 self.phoneLines[lineIdx]["callee"]["index"] = personIdx
 
@@ -272,21 +250,10 @@ class Model(qtc.QObject):
                     self.phoneLines[lineIdx]["isEngaged"] = True
                     # Also set line callee plugged
                     self.phoneLines[lineIdx]["callee"]["isPlugged"] = True
-                    # Silence incoming Hello/Request, if necessary
-                    self.phoneLines[lineIdx]["audioTrack"].stop()
-
+                    # # Silence incoming Hello/Request, if necessary
+                    # self.vlcPlayers[lineIdx].stop()
 
                     self.playConvo(self.currConvo,	lineIdx)
-
-
-                    # self.outgoingTone.play()
-                    # # Timer will playFullConvo
-                    # # Don't think I can send
-                    # # so to my chagrin, setting temp global
-                    # self.lineArgForConvo = lineIdx
-                    # self.outgoingToneTimer.start(2000)
-
-                    # self.displayText.emit(conversations[0]["convoText"])
 
                 else:
                     print("wrong line")
@@ -299,15 +266,23 @@ class Model(qtc.QObject):
         # Set pinIn False
         # self.pinInEvent.emit(personIdx, False)
         self.setPinsIn(personIdx, False)
+        print(f"pin {personIdx} is now {self.pinsIn[personIdx]}")
 
     def handleStart(self):
         """Just for startup
         """
-        self.reset()
-        self.initiateCall()
-        # # print("start up")
-        # self.buzzer.play()
-        # self.blinkerStart.emit(3)
-        # self.displayText.emit("Start text for screen-- Incoming")
+        hasPinsIn = False
+        for pinVal in self.pinsIn:
+            if pinVal == True:
+                hasPinsIn = True
 
+        if hasPinsIn:
+            self.stopAllAudio()
+            self.displayText.emit("pins still in, remove and press Start again")
+            # print("pins still in, remove and press Start again")
+
+        else:
+            self.reset()
+            # self.initiateCall()
+            self.callInitTimer.start(2000)
 
