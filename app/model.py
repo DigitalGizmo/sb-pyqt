@@ -19,15 +19,21 @@ class Model(qtc.QObject):
     blinkerStart = qtc.pyqtSignal(int)
     blinkerStop = qtc.pyqtSignal()
 
+    buzzInstace = vlc.Instance()
+    buzzPlayer = buzzInstace.media_player_new()
+    # toneEvents = tonePlayer.event_manager()
+    media = buzzInstace.media_new_path("/home/piswitch/Apps/sb-audio/buzzer.mp3")
+    buzzPlayer.set_media(media)
+
     toneInstace = vlc.Instance()
     tonePlayer = toneInstace.media_player_new()
     toneEvents = tonePlayer.event_manager()
+    media = toneInstace.media_new_path("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
+    tonePlayer.set_media(media)
 
     vlcInstances = [vlc.Instance(), vlc.Instance()]
     vlcPlayers = [vlcInstances[0].media_player_new(), vlcInstances[1].media_player_new()]
     vlcEvents = [vlcPlayers[0].event_manager(), vlcPlayers[1].event_manager()]
-
-    buzzTrack = vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/buzzer.mp3")
 
     def __init__(self):
         super().__init__()
@@ -50,7 +56,6 @@ class Model(qtc.QObject):
         self.whichLineInUse = -1
         self.prevLineInUse = -1
 
-
         self.NO_UNPLUG_STATUS = 0
         self.AWAITING_INTERRUPT = 1
         self.DURING_INTERRUPT_SILENCE = 2
@@ -62,17 +67,19 @@ class Model(qtc.QObject):
                 "isEngaged": False,
                 "unPlugStatus": self.NO_UNPLUG_STATUS,
                 "caller": {"index": 99, "isPlugged": False},
-                "callee": {"index": 99, "isPlugged": False},
-                "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+                "callee": {"index": 99, "isPlugged": False}
+                # "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
             },
             {
                 "isEngaged": False,
                 "unPlugStatus": self.NO_UNPLUG_STATUS,
                 "caller": {"index": 99, "isPlugged": False},
-                "callee": {"index": 99, "isPlugged": False},
-                "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
+                "callee": {"index": 99, "isPlugged": False}
+                # "audioTrack": vlc.MediaPlayer("/home/piswitch/Apps/sb-audio/1-Charlie_Operator.mp3")
             }
         ]
+
+        self.displayText.emit("Keep your ears open for incoming calls!")
 
     def stopAllAudio(self):
         if self.callInitTimer.isActive():
@@ -82,13 +89,11 @@ class Model(qtc.QObject):
         self.vlcPlayers[1].stop()
         self.tonePlayer.stop()
 
-
     def setPinsIn(self, pinIdx, pinVal):
         self.pinsIn[pinIdx] = pinVal
 
     def getPinsIn(self, pinIdx):
         return self.pinsIn[pinIdx]
-
 
     def initiateCall(self):
         if (self.currConvo < 9):
@@ -97,13 +102,10 @@ class Model(qtc.QObject):
             self.currCalleeIndex = conversations[self.currConvo]["callee"]["index"]
             # This just rings the buzzer. Next action will
             # be when user plugs in a plug - in Panel.svelte drag end: handlePlugIn
-            self.buzzTrack.play()
-            # buzzTrack.volume = .6    
-
-            # self.blinkerStart.emit(3)
+            # buzzTrack.volume = .6   
+            self.buzzPlayer.play()
             self.blinkerStart.emit(conversations[self.currConvo]["caller"]["index"])
-
-            self.displayText.emit("Start text for screen-- Incoming")
+            self.displayText.emit("Incoming call..")
             
             print('-- New call being initiated by: ' + 
                 persons[conversations[self.currConvo]["caller"]["index"]]["name"])
@@ -113,13 +115,13 @@ class Model(qtc.QObject):
             # self.phoneLines[0].audioTrack =
             #     new Audio("https://dev.digitalgizmo.com/msm-ed/ed-assets/audio/FinishedActivity.mp3")
             #     phoneLines[0].audioTrack.play()
+            # Probably reset as well
 
     def playHello(self, _currConvo, lineIndex):
         media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
             conversations[_currConvo]["helloFile"] + ".mp3")
         self.vlcPlayers[lineIndex].set_media(media)
         self.vlcPlayers[lineIndex].play()
-
         # Send msg to screen
         self.displayText.emit(conversations[self.currConvo]["helloText"])
 
@@ -128,14 +130,10 @@ class Model(qtc.QObject):
         """
         This just plays the outgoing tone and then starts the full convo
         """
-
         # Long VLC way of creating callback
+        # reassign event each time
         self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
             self.playFullConvo, currConvo, lineIndex) # playFullConvo(currConvo, lineIndex)
-        
-
-        media = self.toneInstace.media_new_path("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
-        self.tonePlayer.set_media(media)
         self.tonePlayer.play()
 
     def playFullConvo(self, event, _currConvo, lineIndex):
@@ -145,10 +143,7 @@ class Model(qtc.QObject):
         currConvo is already a global, lineArgForConvo is a global created for this purpose
         """
         # print(f"fullconvo, convo: {_currConvo}, linedx: {lineIndex}, dummy: {dummy}")
-
-
         # self.outgoingTone.stop()
-        # self.outgoingToneTimer.stop()
         self.displayText.emit(conversations[_currConvo]["convoText"])
 
         # Simulate callback for convo track finish
@@ -163,9 +158,8 @@ class Model(qtc.QObject):
 
 
     def setCallCompleted(self, event, _currConvo, lineIndex): #, _currConvo, lineIndex
-        print("conversation finished")
-        print(f"fullconvo, convo: {_currConvo}, linedx: {lineIndex}")
-
+        self.vlcEvents.clear() # Prevents mulitple calls to setCallCompleted
+        print(f"finished convo: {_currConvo}, linedx: {lineIndex}")
 
     # def handlePlugIn(self, pluggedIdxInfo):
     def handlePlugIn(self, pluggedIdxInfo):
@@ -202,7 +196,9 @@ class Model(qtc.QObject):
 
                 # Blinker handdled in control.py
                 print("stopping buzz track?")
-                self.buzzTrack.stop()
+                # self.buzzTrack.stop()
+                self.buzzPlayer.stop()
+
                 self.blinkerStop.emit()
 
                 # start incoming request

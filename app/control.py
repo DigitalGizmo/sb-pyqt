@@ -179,7 +179,7 @@ class MainWindow(qtw.QMainWindow):
         GPIO.add_event_detect(interrupt, GPIO.BOTH, callback=checkPin, bouncetime=100)
 
     def reset(self):
-        self.label.setText("Keep your ears open for incoming calls! ")
+        self.label.setText("Press the Start button to begin!")
         self.just_checked = False
         self.pinFlag = 15
         self.pinToBlink = 0
@@ -244,7 +244,7 @@ class MainWindow(qtw.QMainWindow):
         # self.mcp.clear_ints()
         # self.just_checked = False
         # Delay setting just_check to false in case the plug is wiggled
-        qtc.QTimer.singleShot(2000, self.delayedFinishCheck)
+        qtc.QTimer.singleShot(1000, self.delayedFinishCheck)
 
     def delayedFinishCheck(self):
         print("delayed finished check \n")
