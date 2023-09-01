@@ -13,23 +13,27 @@ persons = json.load(personsJsonFile)
 class Model(qtc.QObject):
     """Main logic patterned after software proto
     """
+    # The following signals are connected in control.py
     displayText = qtc.pyqtSignal(str)
     ledEvent = qtc.pyqtSignal(int, bool)
     # pinInEvent = qtc.pyqtSignal(int, bool)
     blinkerStart = qtc.pyqtSignal(int)
     blinkerStop = qtc.pyqtSignal()
+    # The following signal is local
+    nextEvent = qtc.pyqtSignal(int)
 
     buzzInstace = vlc.Instance()
     buzzPlayer = buzzInstace.media_player_new()
     # toneEvents = tonePlayer.event_manager()
-    media = buzzInstace.media_new_path("/home/piswitch/Apps/sb-audio/buzzer.mp3")
-    buzzPlayer.set_media(media)
+    # media = buzzInstace.media_new_path("/home/piswitch/Apps/sb-audio/buzzer.mp3")
+    # buzzPlayer.set_media(media)
+    buzzPlayer.set_media(buzzInstace.media_new_path("/home/piswitch/Apps/sb-audio/buzzer.mp3"))
 
     toneInstace = vlc.Instance()
     tonePlayer = toneInstace.media_player_new()
     toneEvents = tonePlayer.event_manager()
-    media = toneInstace.media_new_path("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
-    tonePlayer.set_media(media)
+    toneMedia = toneInstace.media_new_path("/home/piswitch/Apps/sb-audio/outgoing-ring.mp3")
+    tonePlayer.set_media(toneMedia)
 
     vlcInstances = [vlc.Instance(), vlc.Instance()]
     vlcPlayers = [vlcInstances[0].media_player_new(), vlcInstances[1].media_player_new()]
@@ -42,6 +46,7 @@ class Model(qtc.QObject):
         self.callInitTimer.timeout.connect(self.initiateCall)
         # reconnectTimer = undefined
         # audioCaption = " "
+        self.nextEvent.connect(self.setTimeToNext)
         self.reset()
 
     def reset(self):
@@ -50,7 +55,7 @@ class Model(qtc.QObject):
         # Put pinsIn here in model where it's used more often
         # rather than in control which would require a lot of signaling.
         self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
-        self.currConvo = 1
+        self.currConvo = 0
         self.currCallerIndex = 0
         self.currCalleeIndex = 0
         self.whichLineInUse = -1
@@ -82,12 +87,13 @@ class Model(qtc.QObject):
         self.displayText.emit("Keep your ears open for incoming calls!")
 
     def stopAllAudio(self):
-        if self.callInitTimer.isActive():
-            self.callInitTimer.stop()
+        # if self.callInitTimer.isActive():
+        #     self.callInitTimer.stop()
 
+        self.buzzPlayer.stop()
+        self.tonePlayer.stop()
         self.vlcPlayers[0].stop()
         self.vlcPlayers[1].stop()
-        self.tonePlayer.stop()
 
     def setPinsIn(self, pinIdx, pinVal):
         self.pinsIn[pinIdx] = pinVal
@@ -123,32 +129,41 @@ class Model(qtc.QObject):
         self.vlcPlayers[lineIndex].set_media(media)
         self.vlcPlayers[lineIndex].play()
         # Send msg to screen
-        self.displayText.emit(conversations[self.currConvo]["helloText"])
+        self.displayText.emit(conversations[_currConvo]["helloText"])
 
 
     def playConvo(self, currConvo, lineIndex):
         """
         This just plays the outgoing tone and then starts the full convo
         """
+        print(f"got to play convo, lineIndex: {lineIndex}, currConvo: {currConvo}")
         # Long VLC way of creating callback
         # reassign event each time
+        # self.toneEvents.event_detach(vlc.EventType.MediaPlayerEndReached)
+
+
+
         self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
             self.playFullConvo, currConvo, lineIndex) # playFullConvo(currConvo, lineIndex)
+        
+
+        self.tonePlayer.set_media(self.toneMedia)
+
+
         self.tonePlayer.play()
 
     def playFullConvo(self, event, _currConvo, lineIndex):
-        """
-        In software proto playConvo was just the tone. It had a callback
-        Wish I could pass parameters, but this is called by timer
-        currConvo is already a global, lineArgForConvo is a global created for this purpose
-        """
         # print(f"fullconvo, convo: {_currConvo}, linedx: {lineIndex}, dummy: {dummy}")
         # self.outgoingTone.stop()
         self.displayText.emit(conversations[_currConvo]["convoText"])
 
+
+        # self.toneEvents.clear()
+
+        print(f"playFullConvo, lineIndex: {lineIndex}")
         # Simulate callback for convo track finish
         self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
-            self.setCallCompleted, _currConvo, lineIndex)
+            self.setCallCompleted,lineIndex) #  _currConvo, 
 
         media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
             conversations[_currConvo]["convoFile"] + ".mp3")
@@ -156,10 +171,9 @@ class Model(qtc.QObject):
         self.vlcPlayers[lineIndex].set_media(media)
         self.vlcPlayers[lineIndex].play()
 
+    def setTimeToNext(self, timeToWait):
+        self.callInitTimer.start(timeToWait)        
 
-    def setCallCompleted(self, event, _currConvo, lineIndex): #, _currConvo, lineIndex
-        self.vlcEvents.clear() # Prevents mulitple calls to setCallCompleted
-        print(f"finished convo: {_currConvo}, linedx: {lineIndex}")
 
     # def handlePlugIn(self, pluggedIdxInfo):
     def handlePlugIn(self, pluggedIdxInfo):
@@ -202,7 +216,7 @@ class Model(qtc.QObject):
                 self.blinkerStop.emit()
 
                 # start incoming request
-                self.playHello(0, self.whichLineInUse)
+                self.playHello(self.currConvo, self.whichLineInUse)
 
                 # # Send msg to screen
                 # self.displayText.emit(conversations[0]["helloText"])
@@ -281,4 +295,53 @@ class Model(qtc.QObject):
             self.reset()
             # self.initiateCall()
             self.callInitTimer.start(2000)
+
+    def setCallCompleted(self, event, lineIndex): #, _currConvo, lineIndex
+
+
+        # self.vlcEvents.clear() # Prevents mulitple calls to setCallCompleted
+
+
+
+        #  let otherLineIdx = (lineIndex === 0) ? 1 : 0;
+        # 'true' if True else 'false'
+        otherLineIdx = 1 if (lineIndex == 0) else 0
+        print(f"setCallCompleted() - line:  {lineIndex} stopping, other line has unplug stat of {self.phoneLines[otherLineIdx]['unPlugStatus']}")
+        # Stop call
+        self.stopCall(lineIndex)
+
+        # Much intervening logic to handle call interruption
+
+
+
+        self.currConvo += 1
+        # Use signal rather than calling callInitTimer bcz threads
+        # print("signal next event to time to next")
+        self.nextEvent.emit(1000)
+
+
+
+
+    def stopCall(self, lineIndex):
+        self.clearTheLine(lineIndex)
+        # Reset volume -- in this line was silenced by interrupting call
+
+
+    def clearTheLine(self, lineIdx):
+        # Clear the line settings
+        self.phoneLines[lineIdx]["caller"]["isPlugged"] = False
+        self.phoneLines[lineIdx]["callee"]["isPlugged"] = False
+        self.phoneLines[lineIdx]["isEngaged"] = False
+        self.phoneLines[lineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+        self.prevLineInUse = -1
+        # Turn off the LEDs
+        # persons[phoneLines[lineIdx].caller.index].ledState = LED_OFF;
+        # self.ledEvent.emit(personIdx, False)
+        self.ledEvent.emit(self.phoneLines[lineIdx]["caller"]["index"], False)
+        # Can't turn off callee led if callee index hasn't been defined
+        # console.log('phoneLines[lineIdx].callee.index: '+ phoneLines[lineIdx].callee.index);
+        if (self.phoneLines[lineIdx]["callee"]["index"]):
+            # console.log('got into callee index not null');
+            self.ledEvent.emit(self.phoneLines[lineIdx]["callee"]["index"], False)
+		
 

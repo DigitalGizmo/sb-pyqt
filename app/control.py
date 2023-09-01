@@ -2,6 +2,7 @@ import sys
 # import json
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtCore as qtc
+from PyQt5.QtGui import QFont
 
 import vlc
 import board
@@ -32,18 +33,15 @@ class MainWindow(qtw.QMainWindow):
         # self.label.setText("Keep your ears open for incoming calls! ")
         self.label.setAlignment(qtc.Qt.AlignTop)
         # self.label.setStyleSheet("vertical-align: top;")
-        self.setGeometry(20,120,600,200)
+        # self.label.setFont(QFont('Arial',30))
+        self.label.setFont(QFont('Arial',16))
+        # self.setGeometry(20,80,1200,400)
+        self.setGeometry(20,80,700,250)
         self.setCentralWidget(self.label)
 
         self.model = Model()
 
-        # self.startBounceOnChange = False
-
         # ------ phone call logic------
-        # self.incoming = None
-        # self.outgoingTone = None
-        # self.convo = None
-        # self.whichLineInUse = -1
         self.whichLinePlugging = -1
 
         # --- timers --- 
@@ -56,10 +54,6 @@ class MainWindow(qtw.QMainWindow):
         self.wiggleTimer=qtc.QTimer()
         self.wiggleTimer.timeout.connect(self.checkWiggle)
 
-        # Experiment with changed.connect
-        # self.startUpTimer=QTimer()
-        # self.startUpTimer.timeout.connect(self.continueCheckPin)  
-           
         # Self (control) for gpio related, self.model for audio
         self.startPressed.connect(self.startReset)
         # self.startPressed.connect(self.model.handleStart)
