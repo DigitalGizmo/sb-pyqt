@@ -226,6 +226,12 @@ class MainWindow(qtw.QMainWindow):
             if (self.model.getPinsIn(self.pinFlag)):
                 # print(f"Pin {self.pinFlag} has been disconnected \n")
 
+                # Need to indirectly determine which line is being unpluged.
+                # Cant't test directly bcz stereo ring is no longer in place
+                # pinsIn : instead of True/False make it hold line index
+
+
+
                 # On unplug we can't tell which line electonicaly 
                 # (diff in shaft is gone), so rely on pinsIn info
                 self.unPlugToHandle.emit(self.pinFlag)
@@ -238,7 +244,7 @@ class MainWindow(qtw.QMainWindow):
         # self.mcp.clear_ints()
         # self.just_checked = False
         # Delay setting just_check to false in case the plug is wiggled
-        qtc.QTimer.singleShot(1000, self.delayedFinishCheck)
+        qtc.QTimer.singleShot(300, self.delayedFinishCheck)
 
     def delayedFinishCheck(self):
         print("delayed finished check \n")

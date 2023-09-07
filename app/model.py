@@ -54,8 +54,20 @@ class Model(qtc.QObject):
 
         # Put pinsIn here in model where it's used more often
         # rather than in control which would require a lot of signaling.
+
+
+
+
+        # pinsIn needs to hold lineIndex, 0 or 1. Let's make 3 the default 
+        # so we can test < 3 (easier than > -1 ?)
+
         self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
-        self.currConvo = 0
+
+
+
+
+        
+        self.currConvo = 7
         self.currCallerIndex = 0
         self.currCalleeIndex = 0
         self.whichLineInUse = -1
@@ -127,9 +139,26 @@ class Model(qtc.QObject):
         media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
             conversations[_currConvo]["helloFile"] + ".mp3")
         self.vlcPlayers[lineIndex].set_media(media)
+        # For convo idxs 3 and 7 there is no full convo, so end after hello.
+        # Attach event before playing
+        if (_currConvo == 3 or  _currConvo == 7):
+            print(f"got to currConv = 3 or 7")
+            self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
+                self.endOperatorOnlyHello,lineIndex) #  _currConvo, 
         self.vlcPlayers[lineIndex].play()
         # Send msg to screen
         self.displayText.emit(conversations[_currConvo]["helloText"])
+
+    def endOperatorOnlyHello(self, event, lineIndex):
+            # Don't know what this did in software proto
+            # phoneLines[lineIndex].audioTrack.currentTime = 0;
+            print(f" - Hello-only ended on lineIdx: {lineIndex}")
+            # setHelloOnlyCompleted(lineIndex)
+            # Prob calling currConvo here since it's also a param
+            self.clearTheLine(lineIndex)
+            self.currConvo += 1
+            # self.setTimeToNext(2000);	
+            self.nextEvent.emit(1000)	
 
 
     def playConvo(self, currConvo, lineIndex):
@@ -160,7 +189,7 @@ class Model(qtc.QObject):
 
         # self.toneEvents.clear()
 
-        print(f"playFullConvo, lineIndex: {lineIndex}")
+        print(f"playFullConvo {_currConvo}, lineIndex: {lineIndex}")
         # Simulate callback for convo track finish
         self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
             self.setCallCompleted,lineIndex) #  _currConvo, 
@@ -181,7 +210,6 @@ class Model(qtc.QObject):
         """
         personIdx = pluggedIdxInfo['personIdx']
         lineIdx = pluggedIdxInfo['lineIdx']
-        # print(f'handlePlugIn, pin: {personIdx}, line: {lineIdx}')
 
 		# ********
 		# Fresh plug-in -- aka caller not plugged
@@ -271,12 +299,23 @@ class Model(qtc.QObject):
 
     def handleUnPlug(self, personIdx):
         """ triggered by control.py
+        Need lineIdx!!
         """
         print(f"handle unPlug: {personIdx}")
+
+        # print(f'handlePlugIn, pin: {personIdx}, line: {lineIdx}')
+        # print(f" Unplug line {lineIdx} with status of: {self.phoneLines[lineIdx]["unPlugStatus"]}  while line isEngaged = {self.phoneLines[lineIdx]["isEngaged"]})
+
+
+
+
         # Set pinIn False
         # self.pinInEvent.emit(personIdx, False)
         self.setPinsIn(personIdx, False)
         print(f"pin {personIdx} is now {self.pinsIn[personIdx]}")
+
+
+
 
     def handleStart(self):
         """Just for startup
@@ -297,29 +336,37 @@ class Model(qtc.QObject):
             self.callInitTimer.start(2000)
 
     def setCallCompleted(self, event, lineIndex): #, _currConvo, lineIndex
-
-
-        # self.vlcEvents.clear() # Prevents mulitple calls to setCallCompleted
-
-
-
-        #  let otherLineIdx = (lineIndex === 0) ? 1 : 0;
-        # 'true' if True else 'false'
         otherLineIdx = 1 if (lineIndex == 0) else 0
         print(f"setCallCompleted() - line:  {lineIndex} stopping, other line has unplug stat of {self.phoneLines[otherLineIdx]['unPlugStatus']}")
         # Stop call
         self.stopCall(lineIndex)
 
         # Much intervening logic to handle call interruption
-
-
-
-        self.currConvo += 1
-        # Use signal rather than calling callInitTimer bcz threads
-        # print("signal next event to time to next")
-        self.nextEvent.emit(1000)
-
-
+        # Don't start next call on finish if other line has callee or caller plugged
+        if (self.phoneLines[otherLineIdx].caller.isPlugged or
+            self.phoneLines[otherLineIdx].callee.isPlugged):
+            print('   Completing call with caller or callee plugged on other line')
+            # This is a behind the scenes conversation that was interrupted
+            # and is ending.
+            # Dont increment currConvo
+            # Call has been stopped, so:
+            # phoneLines[lineIndex].unPlugStatus = REPLUG_IN_PROGRESS;
+            self.phoneLines[lineIndex]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+        else:  # Regular ending
+            print("other line has neither caller nor callee plugged")
+            if (self.phoneLines[otherLineIdx]["unPlugStatus"] == self.REPLUG_IN_PROGRESS):
+                # Handle case where this is a silenced call ending automatically
+                # while the interrupting call has been unplugged
+                # Here "other line" is the interrupting call that was unplugged
+                print('   we think this is auto end of silenced call during 2nd call unplug');
+                # Reset the unplug status
+                self.phoneLines[otherLineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+            else:
+                print('  increment and start regular timer for next call')
+                self.currConvo += 1
+                # Use signal rather than calling callInitTimer bcz threads
+                # Uptick currConvo here, when call is comlete
+                self.nextEvent.emit(1000)
 
 
     def stopCall(self, lineIndex):
@@ -339,8 +386,8 @@ class Model(qtc.QObject):
         # self.ledEvent.emit(personIdx, False)
         self.ledEvent.emit(self.phoneLines[lineIdx]["caller"]["index"], False)
         # Can't turn off callee led if callee index hasn't been defined
-        # console.log('phoneLines[lineIdx].callee.index: '+ phoneLines[lineIdx].callee.index);
-        if (self.phoneLines[lineIdx]["callee"]["index"]):
+        # print(f'About to try to turn off .callee.index: {self.phoneLines[lineIdx]["callee"]["index"]}')
+        if (self.phoneLines[lineIdx]["callee"]["index"] < 90):
             # console.log('got into callee index not null');
             self.ledEvent.emit(self.phoneLines[lineIdx]["callee"]["index"], False)
 		
