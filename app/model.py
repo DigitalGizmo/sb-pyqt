@@ -67,11 +67,13 @@ class Model(qtc.QObject):
 
 
         
-        self.currConvo = 7
+        self.currConvo = 0
         self.currCallerIndex = 0
         self.currCalleeIndex = 0
         self.whichLineInUse = -1
         self.prevLineInUse = -1
+
+        self.incrementJustCalled = False
 
         self.NO_UNPLUG_STATUS = 0
         self.AWAITING_INTERRUPT = 1
@@ -114,6 +116,7 @@ class Model(qtc.QObject):
         return self.pinsIn[pinIdx]
 
     def initiateCall(self):
+        self.incrementJustCalled = False
         if (self.currConvo < 9):
             self.currCallerIndex =  conversations[self.currConvo]["caller"]["index"]
             # Set "target", person being called
@@ -142,7 +145,7 @@ class Model(qtc.QObject):
         # For convo idxs 3 and 7 there is no full convo, so end after hello.
         # Attach event before playing
         if (_currConvo == 3 or  _currConvo == 7):
-            print(f"got to currConv = 3 or 7")
+            print(f"** got to currConv = 3 or 7 **")
             self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
                 self.endOperatorOnlyHello,lineIndex) #  _currConvo, 
         self.vlcPlayers[lineIndex].play()
@@ -152,10 +155,10 @@ class Model(qtc.QObject):
     def endOperatorOnlyHello(self, event, lineIndex):
             # Don't know what this did in software proto
             # phoneLines[lineIndex].audioTrack.currentTime = 0;
-            print(f" - Hello-only ended on lineIdx: {lineIndex}")
             # setHelloOnlyCompleted(lineIndex)
             # Prob calling currConvo here since it's also a param
             self.clearTheLine(lineIndex)
+            print(f" ** Hello-only ended on lineIdx: {lineIndex}.  Bump currConvo from {self.currConvo}")
             self.currConvo += 1
             # self.setTimeToNext(2000);	
             self.nextEvent.emit(1000)	
@@ -189,7 +192,7 @@ class Model(qtc.QObject):
 
         # self.toneEvents.clear()
 
-        print(f"playFullConvo {_currConvo}, lineIndex: {lineIndex}")
+        print(f"-- PlayFullConvo {_currConvo}, lineIndex: {lineIndex}")
         # Simulate callback for convo track finish
         self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
             self.setCallCompleted,lineIndex) #  _currConvo, 
@@ -337,14 +340,14 @@ class Model(qtc.QObject):
 
     def setCallCompleted(self, event, lineIndex): #, _currConvo, lineIndex
         otherLineIdx = 1 if (lineIndex == 0) else 0
-        print(f"setCallCompleted() - line:  {lineIndex} stopping, other line has unplug stat of {self.phoneLines[otherLineIdx]['unPlugStatus']}")
+        # print(f"setCallCompleted() - line:  {lineIndex} stopping, other line has unplug stat of {self.phoneLines[otherLineIdx]['unPlugStatus']}")
         # Stop call
         self.stopCall(lineIndex)
 
         # Much intervening logic to handle call interruption
         # Don't start next call on finish if other line has callee or caller plugged
-        if (self.phoneLines[otherLineIdx].caller.isPlugged or
-            self.phoneLines[otherLineIdx].callee.isPlugged):
+        if (self.phoneLines[otherLineIdx]["caller"]["isPlugged"] or
+            self.phoneLines[otherLineIdx]["callee"]["isPlugged"]):
             print('   Completing call with caller or callee plugged on other line')
             # This is a behind the scenes conversation that was interrupted
             # and is ending.
@@ -353,7 +356,7 @@ class Model(qtc.QObject):
             # phoneLines[lineIndex].unPlugStatus = REPLUG_IN_PROGRESS;
             self.phoneLines[lineIndex]["unPlugStatus"] = self.NO_UNPLUG_STATUS
         else:  # Regular ending
-            print("other line has neither caller nor callee plugged")
+            # print("other line has neither caller nor callee plugged")
             if (self.phoneLines[otherLineIdx]["unPlugStatus"] == self.REPLUG_IN_PROGRESS):
                 # Handle case where this is a silenced call ending automatically
                 # while the interrupting call has been unplugged
@@ -362,11 +365,14 @@ class Model(qtc.QObject):
                 # Reset the unplug status
                 self.phoneLines[otherLineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
             else:
-                print('  increment and start regular timer for next call')
-                self.currConvo += 1
-                # Use signal rather than calling callInitTimer bcz threads
-                # Uptick currConvo here, when call is comlete
-                self.nextEvent.emit(1000)
+                # Workaround to stop double calling
+                if not self.incrementJustCalled:
+                    self.incrementJustCalled = True
+                    print(f'  increment from {self.currConvo} and start regular timer for next call.')
+                    self.currConvo += 1
+                    # Use signal rather than calling callInitTimer bcz threads
+                    # Uptick currConvo here, when call is comlete
+                    self.nextEvent.emit(1000)
 
 
     def stopCall(self, lineIndex):

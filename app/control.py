@@ -36,7 +36,7 @@ class MainWindow(qtw.QMainWindow):
         # self.label.setFont(QFont('Arial',30))
         self.label.setFont(QFont('Arial',16))
         # self.setGeometry(20,80,1200,400)
-        self.setGeometry(20,80,700,250)
+        self.setGeometry(15,80,600,250)
         self.setCentralWidget(self.label)
 
         self.model = Model()
