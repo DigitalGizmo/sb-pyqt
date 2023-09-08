@@ -58,12 +58,9 @@ class Model(qtc.QObject):
 
 
 
-        # pinsIn needs to hold lineIndex, 0 or 1. Let's make 3 the default 
-        # so we can test < 3 (easier than > -1 ?)
-
-        self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
-
-
+        # pinsIn needs to hold lineIndex, 0 or 1. -1 the default aka false
+        # self.pinsIn = [False,False,False,False,False,False,False,False,False,False,False,False,False,False]
+        self.pinsInLine = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
 
 
         
@@ -109,11 +106,20 @@ class Model(qtc.QObject):
         self.vlcPlayers[0].stop()
         self.vlcPlayers[1].stop()
 
-    def setPinsIn(self, pinIdx, pinVal):
-        self.pinsIn[pinIdx] = pinVal
+    # def setPinsIn(self, pinIdx, pinVal):
+    #     self.pinsIn[pinIdx] = pinVal
+
+    def setPinInLine(self, pinIdx, pinVal, lineIdx):
+        if pinVal: ## True
+            self.pinsInLine[pinIdx] = lineIdx
+        else: # False
+            self.pinsInLine[pinIdx] = -1
 
     def getPinsIn(self, pinIdx):
         return self.pinsIn[pinIdx]
+
+    def getPinInLine(self, pinIdx):
+        return self.pinsInLine[pinIdx]
 
     def initiateCall(self):
         self.incrementJustCalled = False
@@ -230,7 +236,8 @@ class Model(qtc.QObject):
 
                 # Set this person's jack to plugged
 				# persons[personIdx].isPluggedJack = true;
-                self.setPinsIn(personIdx, True)
+                # self.setPinsIn(personIdx, True)
+                self.setPinInLine(personIdx, True, lineIdx)
 
                 # Set this line as having caller plugged
                 self.phoneLines[lineIdx]["caller"]["isPlugged"] = True
@@ -273,7 +280,8 @@ class Model(qtc.QObject):
                 # # turn this LED on
                 self.ledEvent.emit(personIdx, True)
                 # Set pinsIn True
-                self.setPinsIn(personIdx, True)
+                # self.setPinsIn(personIdx, True)
+                self.setPinInLine(personIdx, True, lineIdx)
 				# Stop the hello operator track
                 # self.phoneLines[lineIdx]["audioTrack"].stop()
 
@@ -304,7 +312,7 @@ class Model(qtc.QObject):
         """ triggered by control.py
         Need lineIdx!!
         """
-        print(f"handle unPlug: {personIdx}")
+        print(f"handle unPlug: {personIdx}, lineIndex --to come--")
 
         # print(f'handlePlugIn, pin: {personIdx}, line: {lineIdx}')
         # print(f" Unplug line {lineIdx} with status of: {self.phoneLines[lineIdx]["unPlugStatus"]}  while line isEngaged = {self.phoneLines[lineIdx]["isEngaged"]})
@@ -314,8 +322,9 @@ class Model(qtc.QObject):
 
         # Set pinIn False
         # self.pinInEvent.emit(personIdx, False)
-        self.setPinsIn(personIdx, False)
-        print(f"pin {personIdx} is now {self.pinsIn[personIdx]}")
+        # self.setPinsIn(personIdx, False)
+        self.setPinInLine(personIdx, False, -1)
+        print(f"pin {personIdx} is now {self.pinsInLine[personIdx]}")
 
 
 
@@ -324,8 +333,9 @@ class Model(qtc.QObject):
         """Just for startup
         """
         hasPinsIn = False
-        for pinVal in self.pinsIn:
-            if pinVal == True:
+        for pinVal in self.pinsInLine:
+            # print(f"pinVal: {pinVal}")
+            if pinVal >= 0:
                 hasPinsIn = True
 
         if hasPinsIn:

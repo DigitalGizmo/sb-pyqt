@@ -50,7 +50,7 @@ class MainWindow(qtw.QMainWindow):
         self.blinkTimer=qtc.QTimer()
         self.blinkTimer.timeout.connect(self.blinker)
         # Supress interrupt when plug is just wiggled
-        self.wiggleDetected.connect(lambda: self.wiggleTimer.start(700))
+        self.wiggleDetected.connect(lambda: self.wiggleTimer.start(400))
         self.wiggleTimer=qtc.QTimer()
         self.wiggleTimer.timeout.connect(self.checkWiggle)
 
@@ -58,7 +58,7 @@ class MainWindow(qtw.QMainWindow):
         self.startPressed.connect(self.startReset)
         # self.startPressed.connect(self.model.handleStart)
 
-        self.plugEventDetected.connect(lambda: self.bounceTimer.start(1000))
+        self.plugEventDetected.connect(lambda: self.bounceTimer.start(800))
         self.plugInToHandle.connect(self.model.handlePlugIn)
         self.unPlugToHandle.connect(self.model.handleUnPlug)
 
@@ -136,7 +136,7 @@ class MainWindow(qtw.QMainWindow):
             """
             for pin_flag in self.mcp.int_flag:
                 # print("Interrupt connected to Pin: {}".format(port))
-                print(f"Interrupt - pin number: {pin_flag} changed to: {self.pins[pin_flag].value}")
+                # print(f"Interrupt - pin number: {pin_flag} changed to: {self.pins[pin_flag].value}")
 
                 # Test for phone jack vs start and stop buttons
                 if (pin_flag < 12):
@@ -147,13 +147,20 @@ class MainWindow(qtw.QMainWindow):
 
                         # print(f"pin {pin_flag} from model = {self.model.getPinsIn(pin_flag)}")
 
+
                         # If this pin is in, delay before checking
                         # to protect against inadvertent wiggle
                         # if (self.pinsIn[pin_flag]):
-                        if (self.model.getPinsIn(pin_flag)):
-                            print(f"pin {pin_flag} is already in")
+                        # if (self.model.getPinsIn(pin_flag)):
+                        if (self.model.getPinInLine(pin_flag) >= 0):
+
+
+                            print(f" ++ pin {pin_flag} is already in")
                             # This will trigger a pause
                             self.wiggleDetected.emit()
+
+
+
 
                         else: # pin is not in, new event
                             # do standard check
@@ -223,19 +230,29 @@ class MainWindow(qtw.QMainWindow):
         else: # pin flag True, still, or again, high
             # was this a legit unplug?
             # if (self.pinsIn[self.pinFlag]): # was plugged in
-            if (self.model.getPinsIn(self.pinFlag)):
+
+
+
+
+            # if (self.model.getPinsIn(self.pinFlag)):
+            if (self.model.getPinInLine(self.pinFlag) >= 0):
                 # print(f"Pin {self.pinFlag} has been disconnected \n")
 
                 # Need to indirectly determine which line is being unpluged.
                 # Cant't test directly bcz stereo ring is no longer in place
                 # pinsIn : instead of True/False make it hold line index
 
-
+                print(f" ++ pin {self.pinFlag} was in on line {self.model.getPinInLine(self.pinFlag)}")
 
                 # On unplug we can't tell which line electonicaly 
                 # (diff in shaft is gone), so rely on pinsIn info
                 self.unPlugToHandle.emit(self.pinFlag)
                 # Model handleUnPlug will set pinsIn false for this on
+
+
+
+
+
             else:
                 print("got to pin true (changed to high), but not pin in")
         
