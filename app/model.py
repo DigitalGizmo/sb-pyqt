@@ -64,7 +64,7 @@ class Model(qtc.QObject):
 
 
         
-        self.currConvo = 0
+        self.currConvo = 7
         self.currCallerIndex = 0
         self.currCalleeIndex = 0
         self.whichLineInUse = -1
@@ -109,14 +109,14 @@ class Model(qtc.QObject):
     # def setPinsIn(self, pinIdx, pinVal):
     #     self.pinsIn[pinIdx] = pinVal
 
-    def setPinInLine(self, pinIdx, pinVal, lineIdx):
-        if pinVal: ## True
-            self.pinsInLine[pinIdx] = lineIdx
-        else: # False
-            self.pinsInLine[pinIdx] = -1
+    def setPinInLine(self, pinIdx, lineIdx):
+        # if pinVal: ## True
+        self.pinsInLine[pinIdx] = lineIdx
+        # else: # False
+            # self.pinsInLine[pinIdx] = -1
 
-    def getPinsIn(self, pinIdx):
-        return self.pinsIn[pinIdx]
+    # def getPinsIn(self, pinIdx):
+    #     return self.pinsIn[pinIdx]
 
     def getPinInLine(self, pinIdx):
         return self.pinsInLine[pinIdx]
@@ -134,8 +134,9 @@ class Model(qtc.QObject):
             self.blinkerStart.emit(conversations[self.currConvo]["caller"]["index"])
             self.displayText.emit("Incoming call..")
             
-            print('-- New call being initiated by: ' + 
-                persons[conversations[self.currConvo]["caller"]["index"]]["name"])
+            print(f'-- New convo {self.currConvo} being initiated by: ' 
+                    f'{persons[conversations[self.currConvo]["caller"]["index"]]["name"]}'
+                )
         else:
             # Play congratulations
             print("Congratulations - done!")
@@ -166,7 +167,6 @@ class Model(qtc.QObject):
             self.clearTheLine(lineIndex)
             print(f" ** Hello-only ended on lineIdx: {lineIndex}.  Bump currConvo from {self.currConvo}")
             self.currConvo += 1
-            # self.setTimeToNext(2000);	
             self.nextEvent.emit(1000)	
 
 
@@ -237,7 +237,7 @@ class Model(qtc.QObject):
                 # Set this person's jack to plugged
 				# persons[personIdx].isPluggedJack = true;
                 # self.setPinsIn(personIdx, True)
-                self.setPinInLine(personIdx, True, lineIdx)
+                self.setPinInLine(personIdx, lineIdx)
 
                 # Set this line as having caller plugged
                 self.phoneLines[lineIdx]["caller"]["isPlugged"] = True
@@ -247,8 +247,7 @@ class Model(qtc.QObject):
                 self.whichLineInUse = lineIdx
 
                 # Blinker handdled in control.py
-                print("stopping buzz track?")
-                # self.buzzTrack.stop()
+                # print("stopping buzz track?")
                 self.buzzPlayer.stop()
 
                 self.blinkerStop.emit()
@@ -281,7 +280,7 @@ class Model(qtc.QObject):
                 self.ledEvent.emit(personIdx, True)
                 # Set pinsIn True
                 # self.setPinsIn(personIdx, True)
-                self.setPinInLine(personIdx, True, lineIdx)
+                self.setPinInLine(personIdx, lineIdx)
 				# Stop the hello operator track
                 # self.phoneLines[lineIdx]["audioTrack"].stop()
 
@@ -308,22 +307,20 @@ class Model(qtc.QObject):
                     print("wrong line")
         
 
-    def handleUnPlug(self, personIdx):
+    def handleUnPlug(self, personIdx, lineIdx):
         """ triggered by control.py
         Need lineIdx!!
         """
-        print(f"handle unPlug: {personIdx}, lineIndex --to come--")
-
-        # print(f'handlePlugIn, pin: {personIdx}, line: {lineIdx}')
-        # print(f" Unplug line {lineIdx} with status of: {self.phoneLines[lineIdx]["unPlugStatus"]}  while line isEngaged = {self.phoneLines[lineIdx]["isEngaged"]})
-
+        print(f" Unplug line {lineIdx} with status of: {self.phoneLines[lineIdx]['unPlugStatus']} "
+               f"while line isEngaged = {self.phoneLines[lineIdx]['isEngaged']}"
+            )
 
 
 
         # Set pinIn False
         # self.pinInEvent.emit(personIdx, False)
         # self.setPinsIn(personIdx, False)
-        self.setPinInLine(personIdx, False, -1)
+        self.setPinInLine(personIdx, -1)
         print(f"pin {personIdx} is now {self.pinsInLine[personIdx]}")
 
 

@@ -19,7 +19,7 @@ class MainWindow(qtw.QMainWindow):
     startPressed = qtc.pyqtSignal()
     plugEventDetected = qtc.pyqtSignal()
     plugInToHandle = qtc.pyqtSignal(dict)
-    unPlugToHandle = qtc.pyqtSignal(int)
+    unPlugToHandle = qtc.pyqtSignal(int, int)
     wiggleDetected = qtc.pyqtSignal()
 
     def __init__(self):
@@ -50,7 +50,7 @@ class MainWindow(qtw.QMainWindow):
         self.blinkTimer=qtc.QTimer()
         self.blinkTimer.timeout.connect(self.blinker)
         # Supress interrupt when plug is just wiggled
-        self.wiggleDetected.connect(lambda: self.wiggleTimer.start(400))
+        self.wiggleDetected.connect(lambda: self.wiggleTimer.start(200))
         self.wiggleTimer=qtc.QTimer()
         self.wiggleTimer.timeout.connect(self.checkWiggle)
 
@@ -246,7 +246,7 @@ class MainWindow(qtw.QMainWindow):
 
                 # On unplug we can't tell which line electonicaly 
                 # (diff in shaft is gone), so rely on pinsIn info
-                self.unPlugToHandle.emit(self.pinFlag)
+                self.unPlugToHandle.emit(self.pinFlag, self.whichLinePlugging)
                 # Model handleUnPlug will set pinsIn false for this on
 
 
