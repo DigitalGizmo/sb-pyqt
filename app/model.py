@@ -44,8 +44,13 @@ class Model(qtc.QObject):
         self.callInitTimer = qtc.QTimer()
         self.callInitTimer.setSingleShot(True)
         self.callInitTimer.timeout.connect(self.initiateCall)
+
+        self.reconnectTimer = qtc.QTimer()
+        self.reconnectTimer.setSingleShot(True)
+        self.reconnectTimer.timeout.connect(self.reCall)
         # reconnectTimer = undefined
         # audioCaption = " "
+
         self.nextEvent.connect(self.setTimeToNext)
         self.reset()
 
@@ -64,13 +69,14 @@ class Model(qtc.QObject):
 
 
         
-        self.currConvo = 7
+        self.currConvo = 1
         self.currCallerIndex = 0
         self.currCalleeIndex = 0
         self.whichLineInUse = -1
         self.prevLineInUse = -1
 
         self.incrementJustCalled = False
+        self.reCallLine = 0 # Workaround timer not having params
 
         self.NO_UNPLUG_STATUS = 0
         self.AWAITING_INTERRUPT = 1
@@ -146,6 +152,7 @@ class Model(qtc.QObject):
             # Probably reset as well
 
     def playHello(self, _currConvo, lineIndex):
+        print("got to playHello")
         media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
             conversations[_currConvo]["helloFile"] + ".mp3")
         self.vlcPlayers[lineIndex].set_media(media)
@@ -195,22 +202,56 @@ class Model(qtc.QObject):
         # self.outgoingTone.stop()
         self.displayText.emit(conversations[_currConvo]["convoText"])
 
-
         # self.toneEvents.clear()
 
         print(f"-- PlayFullConvo {_currConvo}, lineIndex: {lineIndex}")
-        # Simulate callback for convo track finish
+        # Set callback for convo track finish
         self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
             self.setCallCompleted,lineIndex) #  _currConvo, 
-
         media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
             conversations[_currConvo]["convoFile"] + ".mp3")
-
         self.vlcPlayers[lineIndex].set_media(media)
         self.vlcPlayers[lineIndex].play()
 
     def setTimeToNext(self, timeToWait):
         self.callInitTimer.start(timeToWait)        
+
+    def setTimeReCall(self, _currConvo, lineIdx):
+        print("got to setTimeReCall")
+        # reconnectTimer = setTimeout(function() {
+        #     playHello(currConvo, lineIdx);
+        # }, 2000);      
+        
+        self.reCallLine = lineIdx
+        # currConvo is already global
+        self.reconnectTimer.start(2000)
+
+
+
+        # # Don't know how to send params through timer
+        # # so for now play audio with callback
+        # self.vlcEvents[lineIdx].event_attach(vlc.EventType.MediaPlayerEndReached, 
+        #     self.reCall, _currConvo, lineIdx) #  _currConvo, 
+        # media = self.vlcInstances[lineIdx].media_new_path("/home/piswitch/Apps/sb-audio/" + 
+        #      "static.mp3")
+        # self.vlcPlayers[lineIdx].set_media(media)
+        # self.vlcPlayers[lineIdx].play()
+
+
+
+
+    def reCall(self):
+        print("got to reCall")
+        self.playHello(self.currConvo, self.reCallLine)
+        # calling playHello direclty with callback would send event param
+        # self.vlcPlayers[lineIdx].stop()
+
+        # self.nextEvent.emit(1000)
+
+        # self.playHello(_currConvo, lineIdx)
+
+
+
 
 
     # def handlePlugIn(self, pluggedIdxInfo):
@@ -315,13 +356,57 @@ class Model(qtc.QObject):
                f"while line isEngaged = {self.phoneLines[lineIdx]['isEngaged']}"
             )
 
+        # If conversation is in progress -- engaged (implies correct callee)
+        if (self.phoneLines[lineIdx]["isEngaged"]):
+            print(f'  - Unplugging a call in progress person id: {persons[personIdx]["name"]} ' )
+            # Stop the audio
+            self.vlcPlayers[lineIdx].stop()
+            # Clear Transcript 
+            self.displayText.emit("Call disconnected..")
+            # First, handle case here this a sileced call that's being unplugged		
+            if (self.phoneLines[lineIdx]["unPlugStatus"] == self.DURING_INTERRUPT_SILENCE):
+                print('    Unplugging silenced call');
+                self.phoneLines[lineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+                self.stopSilentCall(lineIdx)
+            else: # This is a regular unplug
+                # Handle the three cases of unplugging engaged call
+                # 1) call will be interrupted 2) call is silenced, 3) regular calls 		
+                if (self.phoneLines[lineIdx]["unPlugStatus"] == self.AWAITING_INTERRUPT):
+                    # Disconnecting a call that had already started a timer
+                    # for an interruption
+                    print('    Unplug while awaiting interrupt')
+                    self.currConvo -= 1 # Undo the increment that was set
+                    self.callInitTimer.stop() # bcz we're starting over
+                    # setCallUnplugged(lineIdx); 
+                    # phoneLines[lineIdx].unPlugStatus = REPLUG_IN_PROGRESS;
+                # Try setting this so that if the other silenced call ends
+                # it knows this has been unplugged
+                self.phoneLines[lineIdx]["unPlugStatus"] = self.REPLUG_IN_PROGRESS
+                if (self.phoneLines[lineIdx]["callee"]["index"] == personIdx):  
+                    # callee unplugged
+                    print('   Unplugging callee')
+                    # Turn off callee LED
+
+                    # persons(self.phoneLines[lineIdx]["callee"]["index"], False)
+                    self.ledEvent.emit(self.phoneLines[lineIdx]["callee"]["index"], False)
+
+                    # Mark callee unplugged
+                    self.phoneLines[lineIdx]["callee"]["isPlugged"] = False
+                    self.phoneLines[lineIdx]["isEngaged"] = False
+                    self.vlcPlayers[lineIdx].stop()	
+                    # Leave caller plugged in, replay hello
+                    # reconnectTimer = setTimeout(playHello(currConvo, lineIdx), 3000);
+                    # can't send params through timer, play static instead, with call back
+                    self.setTimeReCall(self.currConvo, lineIdx)
+                    # playHello(currConvo, lineIdx);
 
 
-        # Set pinIn False
-        # self.pinInEvent.emit(personIdx, False)
-        # self.setPinsIn(personIdx, False)
-        self.setPinInLine(personIdx, -1)
-        print(f"pin {personIdx} is now {self.pinsInLine[personIdx]}")
+
+            # Set pinIn False
+            # self.pinInEvent.emit(personIdx, False)
+            # self.setPinsIn(personIdx, False)
+            self.setPinInLine(personIdx, -1)
+            print(f"pin {personIdx} is now {self.pinsInLine[personIdx]}")
 
 
 
@@ -385,6 +470,12 @@ class Model(qtc.QObject):
     def stopCall(self, lineIndex):
         self.clearTheLine(lineIndex)
         # Reset volume -- in this line was silenced by interrupting call
+
+    def stopSilentCall(self, lineIndex):
+        print(f'  Trying to stop silent call on line: {lineIndex}')
+        self.phoneLines[lineIndex]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+        # Clear the line settings
+        self.clearTheLine(lineIndex)
 
 
     def clearTheLine(self, lineIdx):
