@@ -21,15 +21,10 @@ class Model(qtc.QObject):
     blinkerStop = qtc.pyqtSignal()
     # The following signal is local
     nextEvent = qtc.pyqtSignal(int)
+    requestCorrectEvent = qtc.pyqtSignal()
 
     buzzInstace = vlc.Instance()
     buzzPlayer = buzzInstace.media_player_new()
-
-    # buzzPlayer.audio_set_volume(100)
-
-    # toneEvents = tonePlayer.event_manager()
-    # media = buzzInstace.media_new_path("/home/piswitch/Apps/sb-audio/buzzer.mp3")
-    # buzzPlayer.set_media(media)
     buzzPlayer.set_media(buzzInstace.media_new_path("/home/piswitch/Apps/sb-audio/buzzer.mp3"))
 
     toneInstace = vlc.Instance()
@@ -58,8 +53,9 @@ class Model(qtc.QObject):
         self.silencedCalTimer.setSingleShot(True)
         self.silencedCalTimer.timeout.connect(self.silencedCallEnded)
 
-
+        self.requestCorrectEvent.connect(self.playRequestCorrect)
         self.nextEvent.connect(self.setTimeToNext)
+
         self.reset()
 
     def reset(self):
@@ -79,10 +75,7 @@ class Model(qtc.QObject):
         self.incrementJustCalled = False
         self.reCallLine = 0 # Workaround timer not having params
         self.silencedCallLine = 0 # Workaround timer not having params
-
-        # self.vlcPlayers[0].audio_set_volume(100)
-        # self.vlcPlayers[1].audio_set_volume(100)
-
+        self.requestCorrectLine = 0 # Workaround timer not having params
 
         self.NO_UNPLUG_STATUS = 0
         self.AWAITING_INTERRUPT = 1
@@ -118,17 +111,8 @@ class Model(qtc.QObject):
         self.vlcPlayers[0].stop()
         self.vlcPlayers[1].stop()
 
-    # def setPinsIn(self, pinIdx, pinVal):
-    #     self.pinsIn[pinIdx] = pinVal
-
     def setPinInLine(self, pinIdx, lineIdx):
-        # if pinVal: ## True
         self.pinsInLine[pinIdx] = lineIdx
-        # else: # False
-            # self.pinsInLine[pinIdx] = -1
-
-    # def getPinsIn(self, pinIdx):
-    #     return self.pinsIn[pinIdx]
 
     def getPinInLine(self, pinIdx):
         return self.pinsInLine[pinIdx]
@@ -224,35 +208,40 @@ class Model(qtc.QObject):
 
         print(f"-- PlayWrongNun person {pluggedPersonIdx}, lineIndex: {lineIndex}")
         # Set callback for wrongNUm track finish
+
         self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
-            self.playRequestCorrect,lineIndex) #  _currConvo, 
+            self.startPlayRequestCorrect,lineIndex) #  _currConvo, 
+        
         media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
             persons[pluggedPersonIdx]["wrongNumFile"] + ".mp3")
         self.vlcPlayers[lineIndex].set_media(media)
         self.vlcPlayers[lineIndex].play()
 
+
+    def startPlayRequestCorrect(self, event, lineIndex):
+        self.requestCorrectLine = lineIndex
+        self.requestCorrectEvent.emit()
+        # self.requestCorrectTimer.start(1000)
+
+    # def startRequestCorrectTimer(self):
+    #     self.requestCorrectTimer.start(500)
+
     # Reply from caller saying who caller really wants
-    def playRequestCorrect(self, event, lineIndex):
+    def playRequestCorrect(self):
         print(f"got to playRequestCorrect, currConvo: {self.currConvo}")
         # Transcript for correction
         self.displayText.emit(conversations[self.currConvo]["retryAfterWrongText"])
 
+        self.vlcEvents[self.requestCorrectLine].event_attach(vlc.EventType.MediaPlayerEndReached, 
+            self.doNothing) #  needed to replace previous event which would keep calling this itself 
 
-        self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
-            self.doNothing) #  _currConvo, 
-        media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
-            # conversations[self.currConvo]["retryAfterWrongFile"] + ".mp3")
-            conversations[self.currConvo]["convoFile"] + ".mp3")
+        media = self.vlcInstances[self.requestCorrectLine].media_new_path("/home/piswitch/Apps/sb-audio/" + 
+            conversations[self.currConvo]["retryAfterWrongFile"] + ".mp3")
         
-        # media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
-        #     conversations[self.currConvo]["helloFile"] + ".mp3")
-        
-        self.vlcPlayers[lineIndex].set_media(media)
-        self.vlcPlayers[lineIndex].play()
-
+        self.vlcPlayers[self.requestCorrectLine].set_media(media)
+        self.vlcPlayers[self.requestCorrectLine].play()
         # At this point we hope user unplugs wrong number
         # Will be handled by "unPlug"
-
 
     def doNothing(self, event):
         print("do nothing")
