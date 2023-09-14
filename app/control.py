@@ -51,15 +51,18 @@ class MainWindow(qtw.QMainWindow):
         self.blinkTimer=qtc.QTimer()
         self.blinkTimer.timeout.connect(self.blinker)
         # Supress interrupt when plug is just wiggled
-        self.wiggleDetected.connect(lambda: self.wiggleTimer.start(200))
+        self.wiggleDetected.connect(lambda: self.wiggleTimer.start(80))
         self.wiggleTimer=qtc.QTimer()
+        self.wiggleTimer.setSingleShot(True)
         self.wiggleTimer.timeout.connect(self.checkWiggle)
 
         # Self (control) for gpio related, self.model for audio
         self.startPressed.connect(self.startReset)
         # self.startPressed.connect(self.model.handleStart)
 
-        self.plugEventDetected.connect(lambda: self.bounceTimer.start(800))
+        # Bounce timer less than 200 cause failure to detect 2nd line
+        # Tested with 100
+        self.plugEventDetected.connect(lambda: self.bounceTimer.start(200))
         self.plugInToHandle.connect(self.model.handlePlugIn)
         self.unPlugToHandle.connect(self.model.handleUnPlug)
 
@@ -69,6 +72,8 @@ class MainWindow(qtw.QMainWindow):
         # self.model.pinInEvent.connect(self.setPinsIn)
         self.model.blinkerStart.connect(self.startBlinker)
         self.model.blinkerStop.connect(self.stopBlinker)
+        # self.model.checkPinsInEvent.connect(self.checkPinsIn)
+
 
 
         # Initialize the I2C bus:
@@ -137,7 +142,7 @@ class MainWindow(qtw.QMainWindow):
             """
             for pin_flag in self.mcp.int_flag:
                 # print("Interrupt connected to Pin: {}".format(port))
-                # print(f"Interrupt - pin number: {pin_flag} changed to: {self.pins[pin_flag].value}")
+                print(f"Interrupt - pin number: {pin_flag} changed to: {self.pins[pin_flag].value}")
 
                 # Test for phone jack vs start and stop buttons
                 if (pin_flag < 12):
@@ -147,32 +152,35 @@ class MainWindow(qtw.QMainWindow):
                         self.pinFlag = pin_flag
 
                         # print(f"pin {pin_flag} from model = {self.model.getPinsIn(pin_flag)}")
+                        if (not self.awaitingRestart):
+
+                            # If this pin is in, delay before checking
+                            # to protect against inadvertent wiggle
+                            # if (self.pinsIn[pin_flag]):
+                            # if (self.model.getPinsIn(pin_flag)):
+                            if (self.model.getPinInLine(pin_flag) >= 0):
+
+                                print(f" ++ pin {pin_flag} is already in")
+                                # This will trigger a pause
+                                self.wiggleDetected.emit()
+
+                            else: # pin is not in, new event
 
 
-                        # If this pin is in, delay before checking
-                        # to protect against inadvertent wiggle
-                        # if (self.pinsIn[pin_flag]):
-                        # if (self.model.getPinsIn(pin_flag)):
-                        if (self.model.getPinInLine(pin_flag) >= 0):
+                            # elif (not self.awaitingRestart):
+                                # do standard check
+                                self.just_checked = True
+                                # The following signal starts a timer that will continue
+                                # the check. This provides bounce protection
+                                # This signal is separate from the main python event loop
+                                self.plugEventDetected.emit()
 
-
-                            print(f" ++ pin {pin_flag} is already in")
-                            # This will trigger a pause
-                            self.wiggleDetected.emit()
-
-
-
-
-                        else: # pin is not in, new event
-                            # do standard check
-                            self.just_checked = True
-                            # The following signal starts a timer that will continue
-                            # the check. This provides bounce protection
-                            # This signal is separate from the main python event loop
-                            self.plugEventDetected.emit()
+                        else: # awaiting restart
+                            print("pin activity while awaiting restart")
+                            self.just_checked = False
 
                 else:
-                    # print("got to interupt 12 or greater")
+                    print("got to interupt 12 or greater")
                     if (pin_flag == 13 and self.pins[13].value == False):
                         # if (self.pins[13].value == False):
                         self.startPressed.emit()
@@ -185,6 +193,7 @@ class MainWindow(qtw.QMainWindow):
         self.just_checked = False
         self.pinFlag = 15
         self.pinToBlink = 0
+        self.awaitingRestart = False
 
         # Set to input - later will get intrrupt as well
         for pinIndex in range(0, 16):
@@ -232,9 +241,6 @@ class MainWindow(qtw.QMainWindow):
             # was this a legit unplug?
             # if (self.pinsIn[self.pinFlag]): # was plugged in
 
-
-
-
             # if (self.model.getPinsIn(self.pinFlag)):
             if (self.model.getPinInLine(self.pinFlag) >= 0):
                 # print(f"Pin {self.pinFlag} has been disconnected \n")
@@ -250,10 +256,6 @@ class MainWindow(qtw.QMainWindow):
                 self.unPlugToHandle.emit(self.pinFlag, self.whichLinePlugging)
                 # Model handleUnPlug will set pinsIn false for this on
 
-
-
-
-
             else:
                 print("got to pin true (changed to high), but not pin in")
         
@@ -264,13 +266,14 @@ class MainWindow(qtw.QMainWindow):
         # Delay setting just_check to false in case the plug is wiggled
         qtc.QTimer.singleShot(300, self.delayedFinishCheck)
 
+
     def delayedFinishCheck(self):
         print("delayed finished check \n")
         self.just_checked = False
 
     def checkWiggle(self):
         print("got to checkWiggle")
-        self.wiggleTimer.stop()
+        # self.wiggleTimer.stop() -- now singleShot
         # Check whether the pin still grounded
         # if no longer grounded, proceed with event detection
         if (not self.pins[self.pinFlag].value == False):
@@ -297,11 +300,27 @@ class MainWindow(qtw.QMainWindow):
     def stopBlinker(self):
         if self.blinkTimer.isActive():
             self.blinkTimer.stop()
+    def getAnyPinsIn(self):
+        anyPinsIn = False
+
+        for pinIndex in range(0, 12):
+            if self.pins[pinIndex].value == False:
+                anyPinsIn = True
+        return anyPinsIn
 
     def startReset(self):
         print("reseting, starting")
-        self.reset()
-        self.model.handleStart()
+        self.awaitingRestart = True
+        self.model.stopAllAudio()
+        self.model.stopTimers()
+        # _anyPinsIn = self.getAnyPinsIn()
+        # print(f"in reset, anyPinsIn =  {_anyPinsIn}")
+        # if (_anyPinsIn):
+        if (self.getAnyPinsIn()):
+            self.label.setText("Remove phone plugs and press Start again")
+        else:
+            self.reset()
+            self.model.handleStart()
 
 app = qtw.QApplication([])
 

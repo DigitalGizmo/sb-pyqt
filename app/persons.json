@@ -77,7 +77,7 @@
       "number": "82",
       "ledState": 0,
       "wrongNumFile": "TroyBacon_WrongNumber_Callee",
-      "wrongNumText": "Hello, it&apos;s Troy Bacon. Who&apos;s calling?",
+      "wrongNumText": "Hello, it's Troy Bacon. Who's calling?",
       "isPluggedJack": false 
     },
     { "indexLabel":  "6 > 9",

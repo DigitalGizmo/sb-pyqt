@@ -22,6 +22,7 @@ class Model(qtc.QObject):
     # The following signal is local
     nextEvent = qtc.pyqtSignal(int)
     requestCorrectEvent = qtc.pyqtSignal()
+    checkPinsInEvent = qtc.pyqtSignal()
 
     buzzInstace = vlc.Instance()
     buzzPlayer = buzzInstace.media_player_new()
@@ -60,6 +61,8 @@ class Model(qtc.QObject):
 
     def reset(self):
         self.stopAllAudio()
+        self.stopTimers()
+
         # Put pinsIn here in model where it's used more often
         # rather than in control which would require a lot of signaling.
         # pinsIn needs to hold lineIndex, 0 or 1. -1 the default aka false
@@ -76,6 +79,7 @@ class Model(qtc.QObject):
         self.reCallLine = 0 # Workaround timer not having params
         self.silencedCallLine = 0 # Workaround timer not having params
         self.requestCorrectLine = 0 # Workaround timer not having params
+        # self.interruptingCallInHasBeenInitiated = False
 
         self.NO_UNPLUG_STATUS = 0
         self.AWAITING_INTERRUPT = 1
@@ -102,6 +106,15 @@ class Model(qtc.QObject):
 
         self.displayText.emit("Keep your ears open for incoming calls!")
 
+    def stopTimers(self):
+        if self.callInitTimer.isActive():
+            self.callInitTimer.stop()
+        if self.reconnectTimer.isActive():
+            self.reconnectTimer.stop()
+        if self.silencedCalTimer.isActive():
+            self.silencedCalTimer.stop()
+
+
     def stopAllAudio(self):
         # if self.callInitTimer.isActive():
         #     self.callInitTimer.stop()
@@ -120,6 +133,8 @@ class Model(qtc.QObject):
     def initiateCall(self):
         self.incrementJustCalled = False
         if (self.currConvo < 9):
+            print(f'Aledgedly setting currCallerIndex to {conversations[self.currConvo]["caller"]["index"]}'
+                  f' currConvo: {self.currConvo}')
             self.currCallerIndex =  conversations[self.currConvo]["caller"]["index"]
             # Set "target", person being called
             self.currCalleeIndex = conversations[self.currConvo]["callee"]["index"]
@@ -254,7 +269,7 @@ class Model(qtc.QObject):
         # Hack: set reCallLine globally bcz I can't send params thru timer
         self.reCallLine = lineIdx
         # currConvo is already global
-        self.reconnectTimer.start(2000)
+        self.reconnectTimer.start(1000)
         # recconectTimer will call reCall
 
     def reCall(self):
@@ -278,7 +293,8 @@ class Model(qtc.QObject):
 		# *******/
 		# Is this new use of this line -- caller has not been plugged in.
 
-
+        print(f'Start handlePlugIn, line: {lineIdx}'
+              f' is plugged: {self.phoneLines[lineIdx]["caller"]["isPlugged"]}')
         if (not self.phoneLines[lineIdx]["caller"]["isPlugged"]): # New line
             # Did user plug into the actual caller?
             if personIdx == self.currCallerIndex: # Correct caller
@@ -323,6 +339,8 @@ class Model(qtc.QObject):
                             print('    (starting timer for call that will interrupt)')
                             # Move que to next call
                             self.currConvo += 1
+                            # Handle to stop double increment
+                            # self.interruptingCallInHasBeenInitiated = True
                             # Set awaitingInterrupt = true;
                             self.phoneLines[lineIdx]["unPlugStatus"] = self.AWAITING_INTERRUPT
                             # clearTimeout(callInitTimer)
@@ -354,7 +372,7 @@ class Model(qtc.QObject):
                 # print(f"setting prev line in use from {p}")
                 self.prevLineInUse = self.whichLineInUse
             else:
-                print("wrong jack")
+                print("wrong jack -- or wrong line")
                 self.displayText.emit("That's not the jack for the person who is asking you to connect!")
 
         else: # caller is plugged
@@ -388,9 +406,15 @@ class Model(qtc.QObject):
                         print('    (starting timer for call that will interrupt)')
                         # Move que to next call
                         self.currConvo += 1
+                        # Handle to stop double increment
+                        # self.interruptingCallInHasBeenInitiated = True
                         # Set awaitingInterrupt = true;
                         self.phoneLines[lineIdx]["unPlugStatus"] = self.AWAITING_INTERRUPT
                         self.setTimeToNext(15000)
+
+                    # if (personIdx == 11 and (self.currConvo == 1)):
+                    #     print("unsetting interruptingCallInHasBeenInitiated")
+                    #     self.interruptingCallInHasBeenInitiated = False
 
                 else: # Wrong number
                     print("wrong number")
@@ -404,6 +428,11 @@ class Model(qtc.QObject):
         print(f" Unplug line {lineIdx} with status of: {self.phoneLines[lineIdx]['unPlugStatus']} "
                f"while line isEngaged = {self.phoneLines[lineIdx]['isEngaged']}"
             )
+
+
+        # if not during restart!
+
+
 
         # If conversation is in progress -- engaged (implies correct callee)
         if (self.phoneLines[lineIdx]["isEngaged"]):
@@ -509,25 +538,6 @@ class Model(qtc.QObject):
         print(f"pin {personIdx} is now {self.pinsInLine[personIdx]}")
 
 
-    def handleStart(self):
-        """Just for startup
-        """
-        hasPinsIn = False
-        for pinVal in self.pinsInLine:
-            # print(f"pinVal: {pinVal}")
-            if pinVal >= 0:
-                hasPinsIn = True
-
-        if hasPinsIn:
-            self.stopAllAudio()
-            self.displayText.emit("pins still in, remove and press Start again")
-            # print("pins still in, remove and press Start again")
-
-        else:
-            self.reset()
-            # self.initiateCall()
-            self.callInitTimer.start(2000)
-
     def setCallCompleted(self, event, lineIndex): #, _currConvo, lineIndex
         otherLineIdx = 1 if (lineIndex == 0) else 0
         print(f" ** setCallCompleted() - line:  {lineIndex} stopping, other line has" 
@@ -555,6 +565,11 @@ class Model(qtc.QObject):
                 print('   we think this is auto end of silenced call during 2nd call unplug');
                 # Reset the unplug status
                 self.phoneLines[otherLineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+            # Trying to handle interrupting call that isn't answered as an interrupt
+            # This solution doen't work
+            # elif (self.currConvo == 1 or self.currConvo == 5): 
+            #     # if this is interrupting call it shouldn't do the incriment
+            # #     print("- Ignoring end of convo 1 or 5")
             else:
                 # Workaround to stop double calling
                 if not self.incrementJustCalled:
@@ -563,7 +578,23 @@ class Model(qtc.QObject):
                     self.currConvo += 1
                     # Use signal rather than calling callInitTimer bcz threads
                     # Uptick currConvo here, when call is comlete
-                    self.nextEvent.emit(1000)
+
+        # When call 0 ends, do nothing. But how do I kmow this is is 0 ending since
+        # currConvo has already been incremented to 1. When 1 ends I do want to increment.    
+        
+        # if (self.interruptingCallInHasBeenInitiated):
+        #     print("-- Interrupting call has been initiated -- and is ending, do nothing.")    
+
+        # # Trying to handle interrupting call that isn't answered as an interrupt
+        # else:
+        #     # Workaround to stop double calling
+        #     if not self.incrementJustCalled:
+        #         self.incrementJustCalled = True
+        #         print(f'  increment from {self.currConvo} and start regular timer for next call.')
+        #         self.currConvo += 1
+        #         # Use signal rather than calling callInitTimer bcz threads
+        #         # Uptick currConvo here, when call is comlete
+        #         self.nextEvent.emit(1000)
 
 
     def stopCall(self, lineIndex):
@@ -599,4 +630,26 @@ class Model(qtc.QObject):
             # console.log('got into callee index not null');
             self.ledEvent.emit(self.phoneLines[lineIdx]["callee"]["index"], False)
 		
+    def handleStart(self):
+        """Just for startup
+        """
+        # hasSoftPinsIn = False
+        # for pinVal in self.pinsInLine:
+        #     # print(f"pinVal: {pinVal}")
+        #     if pinVal >= 0:
+        #         hasSoftPinsIn = True
+
+        # self.checkPinsInEvent.emit()
+
+
+        # if hasSoftPinsIn:
+        #     self.stopAllAudio()
+        #     self.displayText.emit("pins still in, remove and press Start again")
+        #     # print("pins still in, remove and press Start again")
+
+        # else:
+        print("got to model.handleStart")
+        self.reset()
+        # self.initiateCall()
+        self.callInitTimer.start(2000)
 
