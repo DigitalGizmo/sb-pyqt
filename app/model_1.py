@@ -80,6 +80,7 @@ class Model(qtc.QObject):
         self.silencedCallLine = 0 # Workaround timer not having params
         self.requestCorrectLine = 0 # Workaround timer not having params
         # self.interruptingCallInHasBeenInitiated = False
+        self.endOpOnlyJustCalled = False
 
         self.NO_UNPLUG_STATUS = 0
         self.AWAITING_INTERRUPT = 1
@@ -132,8 +133,9 @@ class Model(qtc.QObject):
 
     def initiateCall(self):
         self.incrementJustCalled = False
+        self.endOpOnlyJustCalled = False
         if (self.currConvo < 9):
-            print(f'Aledgedly setting currCallerIndex to {conversations[self.currConvo]["caller"]["index"]}'
+            print(f'model_1 setting currCallerIndex to {conversations[self.currConvo]["caller"]["index"]}'
                   f' currConvo: {self.currConvo}')
             self.currCallerIndex =  conversations[self.currConvo]["caller"]["index"]
             # Set "target", person being called
@@ -173,14 +175,18 @@ class Model(qtc.QObject):
         self.displayText.emit(conversations[_currConvo]["helloText"])
 
     def endOperatorOnlyHello(self, event, lineIndex):
-            # Don't know what this did in software proto
-            # phoneLines[lineIndex].audioTrack.currentTime = 0;
-            # setHelloOnlyCompleted(lineIndex)
-            # Prob calling currConvo here since it's also a param
-            self.clearTheLine(lineIndex)
-            print(f" ** Hello-only ended on lineIdx: {lineIndex}.  Bump currConvo from {self.currConvo}")
-            self.currConvo += 1
-            self.nextEvent.emit(1000)	
+            if (not self.endOpOnlyJustCalled):
+                self.endOpOnlyJustCalled = True
+                # Don't know what this did in software proto
+                # phoneLines[lineIndex].audioTrack.currentTime = 0;
+                # setHelloOnlyCompleted(lineIndex)
+                # Prob calling currConvo here since it's also a param
+                self.clearTheLine(lineIndex)
+                print(f" ** Hello-only ended on lineIdx: {lineIndex}.  Bump currConvo from {self.currConvo}")
+                self.currConvo += 1
+                self.nextEvent.emit(1000)
+            else:
+                print("supressing additional call to endOpOnly")	
 
 
     def playConvo(self, currConvo, lineIndex):
@@ -197,6 +203,11 @@ class Model(qtc.QObject):
     def playFullConvo(self, event, _currConvo, lineIndex):
         # print(f"fullconvo, convo: {_currConvo}, linedx: {lineIndex}, dummy: {dummy}")
         # self.outgoingTone.stop()
+
+        # Stop tone events from calling more times
+        self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
+            self.doNothing)         
+
         self.displayText.emit(conversations[_currConvo]["convoText"])
 
         print(f"-- PlayFullConvo {_currConvo}, lineIndex: {lineIndex}")
@@ -334,37 +345,38 @@ class Model(qtc.QObject):
                         # Start conversation without the ring
                         self.playFullConvo(self.currConvo,	lineIdx)
 
-                        # If this is redo of call to be interrupted then restar timer
-                        if (self.currConvo == 0 or self.currConvo == 4):
-                            print('    (starting timer for call that will interrupt)')
-                            # Move que to next call
-                            self.currConvo += 1
-                            # Handle to stop double increment
-                            # self.interruptingCallInHasBeenInitiated = True
-                            # Set awaitingInterrupt = true;
-                            self.phoneLines[lineIdx]["unPlugStatus"] = self.AWAITING_INTERRUPT
-                            # clearTimeout(callInitTimer)
-                            self.setTimeToNext(11000); # less than reg 15 secs bcz no ring
+                        # # If this is redo of call to be interrupted then restar timer
+                        # # Disabling call interruption
+                        # if (self.currConvo == 0 or self.currConvo == 4):
+                        #     print('    (starting timer for call that will interrupt)')
+                        #     # Move que to next call
+                        #     self.currConvo += 1
+                        #     # Handle to stop double increment
+                        #     # self.interruptingCallInHasBeenInitiated = True
+                        #     # Set awaitingInterrupt = true;
+                        #     self.phoneLines[lineIdx]["unPlugStatus"] = self.AWAITING_INTERRUPT
+                        #     # clearTimeout(callInitTimer)
+                        #     self.setTimeToNext(11000); # less than reg 15 secs bcz no ring
                     else:
                         print('   We should not get here');
+                # # Disabling multi-call
+                # elif (self.prevLineInUse >= 0): # Silence other conversation, if there is one
+                #     print(f'  - silencing call on line: {self.prevLineInUse}')
+                #     # Set unplug status so that unplugging this silenced call will
+                #     # handled correctly by..
+                #     self.phoneLines[self.prevLineInUse]["unPlugStatus"] = self.DURING_INTERRUPT_SILENCE
 
-                elif (self.prevLineInUse >= 0): # Silence other conversation, if there is one
-                    print(f'  - silencing call on line: {self.prevLineInUse}')
-                    # Set unplug status so that unplugging this silenced call will
-                    # handled correctly by..
-                    self.phoneLines[self.prevLineInUse]["unPlugStatus"] = self.DURING_INTERRUPT_SILENCE
-
-                    self.vlcPlayers[self.prevLineInUse].stop()
-                    # self.vlcPlayers[self.prevLineInUse].audio_set_volume(10)
-                    # Can't set volume on one instance withoug affect all
-                    # Work-around using timer
-                    # Set hacked global param. 
-                    # Fix if I figure out how to send params through timver
-                    self.silencedCallLine = self.prevLineInUse
-                    self.silencedCalTimer.start(4000)
+                #     self.vlcPlayers[self.prevLineInUse].stop()
+                #     # self.vlcPlayers[self.prevLineInUse].audio_set_volume(10)
+                #     # Can't set volume on one instance withoug affect all
+                #     # Work-around using timer
+                #     # Set hacked global param. 
+                #     # Fix if I figure out how to send params through timver
+                #     self.silencedCallLine = self.prevLineInUse
+                #     self.silencedCalTimer.start(4000)
 
 
-                    self.playHello(self.currConvo, lineIdx)
+                #     self.playHello(self.currConvo, lineIdx)
                 else: # Regular, just play incoming Hello/Request
                     self.playHello(self.currConvo, lineIdx)
                 
@@ -400,21 +412,23 @@ class Model(qtc.QObject):
                     # # Silence incoming Hello/Request, if necessary
                     # self.vlcPlayers[lineIdx].stop()
                     self.playConvo(self.currConvo,	lineIdx)
-                    # Set timer for next call
-                    # Hard-wire to interrupt two calls
-                    if (self.currConvo == 0 or self.currConvo == 4):
-                        print('    (starting timer for call that will interrupt)')
-                        # Move que to next call
-                        self.currConvo += 1
-                        # Handle to stop double increment
-                        # self.interruptingCallInHasBeenInitiated = True
-                        # Set awaitingInterrupt = true;
-                        self.phoneLines[lineIdx]["unPlugStatus"] = self.AWAITING_INTERRUPT
-                        self.setTimeToNext(15000)
 
-                    # if (personIdx == 11 and (self.currConvo == 1)):
-                    #     print("unsetting interruptingCallInHasBeenInitiated")
-                    #     self.interruptingCallInHasBeenInitiated = False
+                    # # Disableing mult-calls
+                    # # Set timer for next call
+                    # # Hard-wire to interrupt two calls
+                    # if (self.currConvo == 0 or self.currConvo == 4):
+                    #     print('    (starting timer for call that will interrupt)')
+                    #     # Move que to next call
+                    #     self.currConvo += 1
+                    #     # Handle to stop double increment
+                    #     # self.interruptingCallInHasBeenInitiated = True
+                    #     # Set awaitingInterrupt = true;
+                    #     self.phoneLines[lineIdx]["unPlugStatus"] = self.AWAITING_INTERRUPT
+                    #     self.setTimeToNext(15000)
+
+                    # # if (personIdx == 11 and (self.currConvo == 1)):
+                    # #     print("unsetting interruptingCallInHasBeenInitiated")
+                    # #     self.interruptingCallInHasBeenInitiated = False
 
                 else: # Wrong number
                     print("wrong number")
@@ -441,57 +455,68 @@ class Model(qtc.QObject):
             self.vlcPlayers[lineIdx].stop()
             # Clear Transcript 
             self.displayText.emit("Call disconnected..")
-            # First, handle case here this a sileced call that's being unplugged		
-            if (self.phoneLines[lineIdx]["unPlugStatus"] == self.DURING_INTERRUPT_SILENCE):
-                print('    Unplugging silenced call');
-                self.phoneLines[lineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
-                self.stopSilentCall(lineIdx)
-            else: # This is a regular unplug
-                # Handle the three cases of unplugging engaged call
-                # 1) call will be interrupted 2) call is silenced, 3) regular calls 		
-                if (self.phoneLines[lineIdx]["unPlugStatus"] == self.AWAITING_INTERRUPT):
-                    # Disconnecting a call that had already started a timer
-                    # for an interruption
-                    print('    Unplug while awaiting interrupt')
-                    self.currConvo -= 1 # Undo the increment that was set
-                    self.callInitTimer.stop() # bcz we're starting over
-                    # setCallUnplugged(lineIdx); 
-                    # phoneLines[lineIdx].unPlugStatus = REPLUG_IN_PROGRESS;
-                # Try setting this so that if the other silenced call ends
-                # it knows this has been unplugged
-                self.phoneLines[lineIdx]["unPlugStatus"] = self.REPLUG_IN_PROGRESS
 
-                if (self.phoneLines[lineIdx]["callee"]["index"] == personIdx):  # callee unplugged
-                    print('   Unplugging callee')
-                    # Turn off callee LED
-
-                    # persons(self.phoneLines[lineIdx]["callee"]["index"], False)
-                    self.ledEvent.emit(self.phoneLines[lineIdx]["callee"]["index"], False)
-
-                    # Mark callee unplugged
-                    self.phoneLines[lineIdx]["callee"]["isPlugged"] = False
-                    self.phoneLines[lineIdx]["isEngaged"] = False
-                    self.vlcPlayers[lineIdx].stop()	
-                    # Leave caller plugged in, replay hello
-                    # reconnectTimer = setTimeout(playHello(currConvo, lineIdx), 3000);
-                    # can't send params through timer, play static instead, with call back
-                    self.setTimeReCall(self.currConvo, lineIdx)
-                    # playHello(currConvo, lineIdx);
-                elif (self.phoneLines[lineIdx]["caller"]["index"] == personIdx): # caller unplugged
-                    self.phoneLines[lineIdx]["caller"]["isPlugged"] = False
-                    self.phoneLines[lineIdx]["isEngaged"] = False
-                    # Also
-                    self.phoneLines[lineIdx]["unPlugStatus"] = self.CALLER_UNPLUGGED
-                    # ? prevLineInUse = -1;
-                    # Turn off caller LED
-                    self.ledEvent.emit(self.phoneLines[lineIdx]["caller"]["index"], False)
-                    self.setTimeToNext(2000);							
-
-                else: 
-                    print('    This should not happen')
+            # # Disabling multi-call
+            # # First, handle case here this a sileced call that's being unplugged		
+            # if (self.phoneLines[lineIdx]["unPlugStatus"] == self.DURING_INTERRUPT_SILENCE):
+            #     print('    Unplugging silenced call');
+            #     self.phoneLines[lineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+            #     self.stopSilentCall(lineIdx)
+            # else: # This is a regular unplug
 
 
+            # # Handle the three cases of unplugging engaged call
+            # # 1) call will be interrupted 2) call is silenced, 3) regular calls 		
+            # if (self.phoneLines[lineIdx]["unPlugStatus"] == self.AWAITING_INTERRUPT):
+            #     # Disconnecting a call that had already started a timer
+            #     # for an interruption
+            #     print('    Unplug while awaiting interrupt')
+            #     self.currConvo -= 1 # Undo the increment that was set
+            #     self.callInitTimer.stop() # bcz we're starting over
+            #     # setCallUnplugged(lineIdx); 
+            #     # phoneLines[lineIdx].unPlugStatus = REPLUG_IN_PROGRESS;
+            # # Try setting this so that if the other silenced call ends
+            # # it knows this has been unplugged
+            # self.phoneLines[lineIdx]["unPlugStatus"] = self.REPLUG_IN_PROGRESS
 
+            if (self.phoneLines[lineIdx]["callee"]["index"] == personIdx):  # callee unplugged
+                print('   Unplugging callee')
+                # Turn off callee LED
+
+                # persons(self.phoneLines[lineIdx]["callee"]["index"], False)
+                self.ledEvent.emit(self.phoneLines[lineIdx]["callee"]["index"], False)
+
+                # Mark callee unplugged
+                self.phoneLines[lineIdx]["callee"]["isPlugged"] = False
+                self.phoneLines[lineIdx]["isEngaged"] = False
+                self.vlcPlayers[lineIdx].stop()	
+                # Leave caller plugged in, replay hello
+                # reconnectTimer = setTimeout(playHello(currConvo, lineIdx), 3000);
+                # can't send params through timer, play static instead, with call back
+                self.setTimeReCall(self.currConvo, lineIdx)
+                # playHello(currConvo, lineIdx);
+            elif (self.phoneLines[lineIdx]["caller"]["index"] == personIdx): # caller unplugged
+                self.phoneLines[lineIdx]["caller"]["isPlugged"] = False
+                self.phoneLines[lineIdx]["isEngaged"] = False
+                # Also
+                self.phoneLines[lineIdx]["unPlugStatus"] = self.CALLER_UNPLUGGED
+                # ? prevLineInUse = -1;
+                # Turn off caller LED
+                self.ledEvent.emit(self.phoneLines[lineIdx]["caller"]["index"], False)
+                self.setTimeToNext(2000);							
+
+            else: 
+                print('    This should not happen')
+
+
+        # Phone line is not engaged -- isEngaged == False
+
+        # First, maybe this is an unplug of "old" call to free up the plugg
+        # caller would be plugged
+        elif (self.phoneLines[lineIdx]["caller"]["isPlugged"] == True):
+            print("legit unplug, ignore")
+            
+        # With the above, are the following two conditions ever satisfied?
         elif (self.phoneLines[lineIdx]["unPlugStatus"] == self.REPLUG_IN_PROGRESS):
             # Don't do anything about unplug if one end of the line
             # has already been unplugged.
@@ -505,6 +530,7 @@ class Model(qtc.QObject):
             # Also test for whether this unplug was an erroneous attempt
             # at re-plugging the caller??
             print('   Unplugg on the wrong jack during caller unplug')
+
 
         else:   # Line was not fully engaged
             print(f' ++ not engaged, callee index: {self.phoneLines[lineIdx]["callee"]["index"]}')
@@ -545,40 +571,43 @@ class Model(qtc.QObject):
         # Stop call
         self.stopCall(lineIndex)
 
-        # Much intervening logic to handle call interruption
-        # Don't start next call on finish if other line has callee or caller plugged
-        if (self.phoneLines[otherLineIdx]["caller"]["isPlugged"] or
-            self.phoneLines[otherLineIdx]["callee"]["isPlugged"]):
-            print('   Completing call with caller or callee plugged on other line')
-            # This is a behind the scenes conversation that was interrupted
-            # and is ending.
-            # Dont increment currConvo
-            # Call has been stopped, so:
-            # phoneLines[lineIndex].unPlugStatus = REPLUG_IN_PROGRESS;
-            self.phoneLines[lineIndex]["unPlugStatus"] = self.NO_UNPLUG_STATUS
-        else:  # Regular ending
-            # print("other line has neither caller nor callee plugged")
-            if (self.phoneLines[otherLineIdx]["unPlugStatus"] == self.REPLUG_IN_PROGRESS):
-                # Handle case where this is a silenced call ending automatically
-                # while the interrupting call has been unplugged
-                # Here "other line" is the interrupting call that was unplugged
-                print('   we think this is auto end of silenced call during 2nd call unplug');
-                # Reset the unplug status
-                self.phoneLines[otherLineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
-            # Trying to handle interrupting call that isn't answered as an interrupt
-            # This solution doen't work
-            # elif (self.currConvo == 1 or self.currConvo == 5): 
-            #     # if this is interrupting call it shouldn't do the incriment
-            # #     print("- Ignoring end of convo 1 or 5")
-            else:
-                # Workaround to stop double calling
-                if not self.incrementJustCalled:
-                    self.incrementJustCalled = True
-                    print(f'  increment from {self.currConvo} and start regular timer for next call.')
-                    # Uptick currConvo here, when call is comlete
-                    self.currConvo += 1
-                    # Use signal rather than calling callInitTimer bcz threads
-                    self.nextEvent.emit(1000)
+        # # Disable multi-call
+        # # Much intervening logic to handle call interruption
+        # # Don't start next call on finish if other line has callee or caller plugged
+        # if (self.phoneLines[otherLineIdx]["caller"]["isPlugged"] or
+        #     self.phoneLines[otherLineIdx]["callee"]["isPlugged"]):
+        #     print('   Completing call with caller or callee plugged on other line')
+        #     # This is a behind the scenes conversation that was interrupted
+        #     # and is ending.
+        #     # Dont increment currConvo
+        #     # Call has been stopped, so:
+        #     # phoneLines[lineIndex].unPlugStatus = REPLUG_IN_PROGRESS;
+        #     self.phoneLines[lineIndex]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+        # else: 
+
+        # Regular ending
+        # print("other line has neither caller nor callee plugged")
+        if (self.phoneLines[otherLineIdx]["unPlugStatus"] == self.REPLUG_IN_PROGRESS):
+            # Handle case where this is a silenced call ending automatically
+            # while the interrupting call has been unplugged
+            # Here "other line" is the interrupting call that was unplugged
+            print('   we think this is auto end of silenced call during 2nd call unplug');
+            # Reset the unplug status
+            self.phoneLines[otherLineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+        # Trying to handle interrupting call that isn't answered as an interrupt
+        # This solution doen't work
+        # elif (self.currConvo == 1 or self.currConvo == 5): 
+        #     # if this is interrupting call it shouldn't do the incriment
+        # #     print("- Ignoring end of convo 1 or 5")
+        else:
+            # Workaround to stop double calling
+            if not self.incrementJustCalled:
+                self.incrementJustCalled = True
+                print(f'  increment from {self.currConvo} and start regular timer for next call.')
+                # Uptick currConvo here, when call is comlete
+                self.currConvo += 1
+                # Use signal rather than calling callInitTimer bcz threads
+                self.nextEvent.emit(1000)
 
         # When call 0 ends, do nothing. But how do I kmow this is is 0 ending since
         # currConvo has already been incremented to 1. When 1 ends I do want to increment.    
