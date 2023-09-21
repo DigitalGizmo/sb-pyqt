@@ -80,11 +80,11 @@ class Model(qtc.QObject):
         self.silencedCallLine = 0 # Workaround timer not having params
         self.requestCorrectLine = 0 # Workaround timer not having params
         # self.interruptingCallInHasBeenInitiated = False
-        self.endOpOnlyJustCalled = False
 
         self.NO_UNPLUG_STATUS = 0
-        self.AWAITING_INTERRUPT = 1
-        self.DURING_INTERRUPT_SILENCE = 2
+        self.WRONG_NUM_IN_PROGRESS = 1
+        # self.AWAITING_INTERRUPT = 1
+        # self.DURING_INTERRUPT_SILENCE = 2
         self.REPLUG_IN_PROGRESS = 3
         self.CALLER_UNPLUGGED = 5
 
@@ -133,9 +133,9 @@ class Model(qtc.QObject):
 
     def initiateCall(self):
         self.incrementJustCalled = False
-        self.endOpOnlyJustCalled = False
+
         if (self.currConvo < 9):
-            print(f'model_1 setting currCallerIndex to {conversations[self.currConvo]["caller"]["index"]}'
+            print(f'-- Setting currCallerIndex to {conversations[self.currConvo]["caller"]["index"]}'
                   f' currConvo: {self.currConvo}')
             self.currCallerIndex =  conversations[self.currConvo]["caller"]["index"]
             # Set "target", person being called
@@ -175,19 +175,14 @@ class Model(qtc.QObject):
         self.displayText.emit(conversations[_currConvo]["helloText"])
 
     def endOperatorOnlyHello(self, event, lineIndex):
-            if (not self.endOpOnlyJustCalled):
-                self.endOpOnlyJustCalled = True
-                # Don't know what this did in software proto
-                # phoneLines[lineIndex].audioTrack.currentTime = 0;
-                # setHelloOnlyCompleted(lineIndex)
-                # Prob calling currConvo here since it's also a param
-                self.clearTheLine(lineIndex)
-                print(f" ** Hello-only ended on lineIdx: {lineIndex}.  Bump currConvo from {self.currConvo}")
-                self.currConvo += 1
-                self.nextEvent.emit(1000)
-            else:
-                print("supressing additional call to endOpOnly")	
-
+            self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
+                self.supressCallback) #  supress further callbacks
+            # Don't know what this did in software proto
+            # setHelloOnlyCompleted(lineIndex)
+            self.clearTheLine(lineIndex)
+            print(f" ** Hello-only ended on lineIdx: {lineIndex}.  Bump currConvo from {self.currConvo}")
+            self.currConvo += 1
+            self.nextEvent.emit(1000)
 
     def playConvo(self, currConvo, lineIndex):
         """
@@ -206,7 +201,7 @@ class Model(qtc.QObject):
 
         # Stop tone events from calling more times
         self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
-            self.doNothing)         
+            self.supressCallback)         
 
         self.displayText.emit(conversations[_currConvo]["convoText"])
 
@@ -229,6 +224,9 @@ class Model(qtc.QObject):
 
     def playFullWrongNum(self, event, pluggedPersonIdx, lineIndex):
         # wrongNumFile = persons[pluggedPersonIdx]["wrongNumFile"]
+        # disable event
+        self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
+            self.supressCallback) # playFullConvo(currConvo, lineIndex)
 
         self.displayText.emit(persons[pluggedPersonIdx]["wrongNumText"])
 
@@ -259,7 +257,7 @@ class Model(qtc.QObject):
         self.displayText.emit(conversations[self.currConvo]["retryAfterWrongText"])
 
         self.vlcEvents[self.requestCorrectLine].event_attach(vlc.EventType.MediaPlayerEndReached, 
-            self.doNothing) #  needed to replace previous event which would keep calling this itself 
+            self.supressCallback) #  needed to replace previous event which would keep calling this itself 
 
         media = self.vlcInstances[self.requestCorrectLine].media_new_path("/home/piswitch/Apps/sb-audio/" + 
             conversations[self.currConvo]["retryAfterWrongFile"] + ".mp3")
@@ -269,8 +267,8 @@ class Model(qtc.QObject):
         # At this point we hope user unplugs wrong number
         # Will be handled by "unPlug"
 
-    def doNothing(self, event):
-        print("do nothing")
+    def supressCallback(self, event):
+        print("supress video end callback")
 
     def setTimeToNext(self, timeToWait):
         self.callInitTimer.start(timeToWait)        
@@ -432,6 +430,8 @@ class Model(qtc.QObject):
 
                 else: # Wrong number
                     print("wrong number")
+                    self.phoneLines[lineIdx]["unPlugStatus"] = self.WRONG_NUM_IN_PROGRESS
+
                     self.playWrongNum(personIdx, lineIdx)
         
 
@@ -508,54 +508,81 @@ class Model(qtc.QObject):
             else: 
                 print('    This should not happen')
 
-
         # Phone line is not engaged -- isEngaged == False
 
-        # First, maybe this is an unplug of "old" call to free up the plugg
-        # caller would be plugged
-        elif (self.phoneLines[lineIdx]["caller"]["isPlugged"] == True):
-            print("legit unplug, ignore")
+        # # # First, maybe this is an unplug of "old" call to free up the plugg
+        # # # caller would be plugged
+        # elif (self.phoneLines[lineIdx]["caller"]["isPlugged"] == True):
+        #     print(f'  Unplug on wrong number, personIdx: {personIdx}')
+        #     # Cover for before personidx defined
+        #     if (personIdx < 99):
+        #         self.ledEvent.emit(personIdx, False)
             
-        # With the above, are the following two conditions ever satisfied?
-        elif (self.phoneLines[lineIdx]["unPlugStatus"] == self.REPLUG_IN_PROGRESS):
-            # Don't do anything about unplug if one end of the line
-            # has already been unplugged.
-            print('  Re-plug in progress - unplugging the other end ')
-            # This is the remaining end unplugged, so clear the REPLUG
-            self.phoneLines[lineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+        # # With the above, are the following two conditions ever satisfied?
+        # elif (self.phoneLines[lineIdx]["unPlugStatus"] == self.REPLUG_IN_PROGRESS):
+        #     # Don't do anything about unplug if one end of the line
+        #     # has already been unplugged.
+        #     print('  Re-plug in progress - unplugging the other end ')
+        #     # This is the remaining end unplugged, so clear the REPLUG
+        #     self.phoneLines[lineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
             
-            # Somewher in here condition for if CALLER_UNPLUGGED then
-            # 		don't unplug the callee
-        elif (self.phoneLines[lineIdx]["unPlugStatus"] == self.CALLER_UNPLUGGED):
-            # Also test for whether this unplug was an erroneous attempt
-            # at re-plugging the caller??
-            print('   Unplugg on the wrong jack during caller unplug')
+        #     # Somewher in here condition for if CALLER_UNPLUGGED then
+        #     # 		don't unplug the callee
+        # elif (self.phoneLines[lineIdx]["unPlugStatus"] == self.CALLER_UNPLUGGED):
+        #     # Also test for whether this unplug was an erroneous attempt
+        #     # at re-plugging the caller??
+        #     print('   Unplugg on the wrong jack during caller unplug')
 
 
-        else:   # Line was not fully engaged
+        else:   # Line was not fully engaged 
             print(f' ++ not engaged, callee index: {self.phoneLines[lineIdx]["callee"]["index"]}')
-            if (self.phoneLines[lineIdx]["callee"]["index"] < 90): # callee jack was unplugged
-                print('  ** Unplug on callee thats not engaged ')
 
-                self.ledEvent.emit(self.phoneLines[lineIdx]["callee"]["index"], False)
+            # If wrong number, hmm need plug status for wrong number
 
-                # Clear transcript?
-                self.displayText.emit(" ")
-            else:
-                # Wasn't callee that was unplugged (& line wasn't engaged),
-                # so might have been wrong num that was unplugged
-                # Need to turn off LED
-                print(f'  Unplug was prob on wrong number, personIdx: {personIdx}')
-                # Cover for before personidx defined
-                if (personIdx < 99):
-                    self.ledEvent.emit(personIdx, False)
 
-            self.vlcPlayers[lineIdx].stop()
+            # # First, maybe this is an unplug of "old" call to free up the plugg
+            # # caller would be plugged
+            if (self.phoneLines[lineIdx]["caller"]["isPlugged"] == True):
+                # Caller is has initiated a call
+                if (self.phoneLines[lineIdx]["unPlugStatus"] == self.WRONG_NUM_IN_PROGRESS):
+                    # Unplugging wrong num
+                    print(f'  Unplug on wrong number, personIdx: {personIdx}')
+                    self.vlcPlayers[lineIdx].stop()
+                    # Cover for before personidx defined
+                    if (personIdx < 99):
+                        self.ledEvent.emit(personIdx, False)
+                    # clear the unplug status
+                    self.phoneLines[lineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
+                else: # Not unplugging wrong - do nothing
+                    print(" just unplugging to free up a plug")
+
+            else: # caller not plugged
+                print(" nothing going on, just unplugging ")
+
+            # print(f' ++ not engaged, callee index: {self.phoneLines[lineIdx]["callee"]["index"]}')
+            # if (self.phoneLines[lineIdx]["callee"]["index"] < 90): # callee jack was unplugged
+            #     print('  ** Unplug on callee thats not engaged ')
+
+            #     self.ledEvent.emit(self.phoneLines[lineIdx]["callee"]["index"], False)
+
+            #     # Clear transcript?
+            #     self.displayText.emit(" ")
+            # else:
+            #     # Wasn't callee that was unplugged (& line wasn't engaged),
+            #     # so might have been wrong num that was unplugged
+            #     # Need to turn off LED
+            #     # print(f'  Unplug was prob on wrong number, personIdx: {personIdx}')
+            #     # # Cover for before personidx defined
+            #     # if (personIdx < 99):
+            #     #     self.ledEvent.emit(personIdx, False)
+            #     print("orphaned else in unplug")
+
+            # self.vlcPlayers[lineIdx].stop()
         
-            #  and if was during isWrongNumInProgress
-            # then 
-                # (just) turn off this led
-                # which allows another plugin?
+            # #  and if was during isWrongNumInProgress
+            # # then 
+            #     # (just) turn off this led
+            #     # which allows another plugin?
 
 
 
@@ -565,6 +592,10 @@ class Model(qtc.QObject):
 
 
     def setCallCompleted(self, event, lineIndex): #, _currConvo, lineIndex
+        # Disable callback
+        self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
+            self.supressCallback) #  _currConvo, 
+                
         otherLineIdx = 1 if (lineIndex == 0) else 0
         print(f" ** setCallCompleted. Convo: {self.currConvo},  line:  {lineIndex} stopping. Other line has" 
               f"unplug stat of {self.phoneLines[otherLineIdx]['unPlugStatus']}")

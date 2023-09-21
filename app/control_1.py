@@ -14,7 +14,7 @@ from adafruit_mcp230xx.mcp23017 import MCP23017
 from model_1 import Model
 
 class MainWindow(qtw.QMainWindow): 
-    # Almost all of this should be in separate module analogous to svelte Panel
+    # Most of this module is analogous to svelte Panel
 
     startPressed = qtc.pyqtSignal()
     plugEventDetected = qtc.pyqtSignal()
@@ -154,26 +154,29 @@ class MainWindow(qtw.QMainWindow):
                         # print(f"pin {pin_flag} from model = {self.model.getPinsIn(pin_flag)}")
                         if (not self.awaitingRestart):
 
-                            # If this pin is in, delay before checking
-                            # to protect against inadvertent wiggle
-                            # if (self.pinsIn[pin_flag]):
-                            # if (self.model.getPinsIn(pin_flag)):
-                            if (self.model.getPinInLine(pin_flag) >= 0):
+                            # Disabling wiggle check
+                            # # If this pin is in, delay before checking
+                            # # to protect against inadvertent wiggle
+                            # # if (self.pinsIn[pin_flag]):
+                            # # if (self.model.getPinsIn(pin_flag)):
+                            # if (self.model.getPinInLine(pin_flag) >= 0):
 
-                                print(f" ++ pin {pin_flag} is already in")
-                                # This will trigger a pause
-                                self.wiggleDetected.emit()
+                            #     print(f" ++ pin {pin_flag} is already in")
+                            #     # This will trigger a pause
+                            #     self.wiggleDetected.emit()
 
-                            else: # pin is not in, new event
+                            # else: # pin is not in, new event
 
 
                             # elif (not self.awaitingRestart):
-                                # do standard check
-                                self.just_checked = True
-                                # The following signal starts a timer that will continue
-                                # the check. This provides bounce protection
-                                # This signal is separate from the main python event loop
-                                self.plugEventDetected.emit()
+
+
+                            # do standard check
+                            self.just_checked = True
+                            # The following signal starts a timer that will continue
+                            # the check. This provides bounce protection
+                            # This signal is separate from the main python event loop
+                            self.plugEventDetected.emit()
 
                         else: # awaiting restart
                             print("pin activity while awaiting restart")
@@ -264,12 +267,17 @@ class MainWindow(qtw.QMainWindow):
         # self.mcp.clear_ints()
         # self.just_checked = False
         # Delay setting just_check to false in case the plug is wiggled
-        qtc.QTimer.singleShot(300, self.delayedFinishCheck)
+        # qtc.QTimer.singleShot(300, self.delayedFinishCheck)
+        qtc.QTimer.singleShot(110, self.delayedFinishCheck)
 
 
     def delayedFinishCheck(self):
         print("delayed finished check \n")
         self.just_checked = False
+
+        # Experimental
+        self.mcp.clear_ints()  # This seems to keep things fresh
+
 
     def checkWiggle(self):
         print("got to checkWiggle")
