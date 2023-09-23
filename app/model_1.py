@@ -195,6 +195,13 @@ class Model(qtc.QObject):
         self.tonePlayer.set_media(self.toneMedia)
         self.tonePlayer.play()
 
+    # def playFullConvoFromEvent(self, event, _currConvo, lineIndex):
+    #     """ This allows playing fullConvo without sending the event param.
+    #     This happens when the caller is unplugged
+    #     """
+    #     print("inf playFullConvoFromEvent trying to relay to fullConvo")
+    #     self.playFullConvo(self, _currConvo, lineIndex)
+
     def playFullConvo(self, event, _currConvo, lineIndex):
         # print(f"fullconvo, convo: {_currConvo}, linedx: {lineIndex}, dummy: {dummy}")
         # self.outgoingTone.stop()
@@ -213,6 +220,28 @@ class Model(qtc.QObject):
             conversations[_currConvo]["convoFile"] + ".mp3")
         self.vlcPlayers[lineIndex].set_media(media)
         self.vlcPlayers[lineIndex].play()
+
+
+    def playFullConvoNoEvent(self, _currConvo, lineIndex):
+        # print(f"fullconvo, convo: {_currConvo}, linedx: {lineIndex}, dummy: {dummy}")
+        # self.outgoingTone.stop()
+
+        # # Stop tone events from calling more times
+        # self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
+        #     self.supressCallback)         
+
+        self.displayText.emit(conversations[_currConvo]["convoText"])
+
+        print(f"-- PlayFullConvoNoEvent {_currConvo}, lineIndex: {lineIndex}")
+        # Set callback for convo track finish
+        self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
+            self.setCallCompleted,lineIndex) #  _currConvo, 
+        media = self.vlcInstances[lineIndex].media_new_path("/home/piswitch/Apps/sb-audio/" + 
+            conversations[_currConvo]["convoFile"] + ".mp3")
+        self.vlcPlayers[lineIndex].set_media(media)
+        self.vlcPlayers[lineIndex].play()
+
+
 
     def playWrongNum(self, pluggedPersonIdx, lineIndex):
         print(f"got to play wrong number, lineIndex: {lineIndex}, currConvo: {self.currConvo}")
@@ -243,6 +272,9 @@ class Model(qtc.QObject):
 
 
     def startPlayRequestCorrect(self, event, lineIndex):
+        self.vlcEvents[lineIndex].event_attach(vlc.EventType.MediaPlayerEndReached, 
+            self.supressCallback) #  _currConvo, 
+
         self.requestCorrectLine = lineIndex
         self.requestCorrectEvent.emit()
         # self.requestCorrectTimer.start(1000)
@@ -303,8 +335,8 @@ class Model(qtc.QObject):
 		# Is this new use of this line -- caller has not been plugged in.
 
         print(f'Start handlePlugIn, line: {lineIdx}'
-              f' is plugged: {self.phoneLines[lineIdx]["caller"]["isPlugged"]}')
-        if (not self.phoneLines[lineIdx]["caller"]["isPlugged"]): # New line
+              f' caller is plugged: {self.phoneLines[lineIdx]["caller"]["isPlugged"]}')
+        if (not self.phoneLines[lineIdx]["caller"]["isPlugged"]): # New line - Caller not plugged
             # Did user plug into the actual caller?
             if personIdx == self.currCallerIndex: # Correct caller
                 # Turn this LED on
@@ -315,6 +347,7 @@ class Model(qtc.QObject):
                 self.phoneLines[lineIdx]["caller"]["isPlugged"] = True
                 # Set identity of caller on this line
                 self.phoneLines[lineIdx]["caller"]["index"] = personIdx;				
+                print(f' - Just set caller {self.phoneLines[lineIdx]["caller"]["index"]} to True')
                 # Set this line in use only we have gotten this success
                 self.whichLineInUse = lineIdx
                 # See software app for extended debug message here
@@ -327,7 +360,7 @@ class Model(qtc.QObject):
 
                 #  Handle case where caller was unplugged
                 if (self.phoneLines[lineIdx]["unPlugStatus"] == self.CALLER_UNPLUGGED):
-                    print("  - Caller was unplugged: " + lineIdx)
+                    print(f"  - Caller was unplugged: {lineIdx}")
                     """ more logic here  
                     """
                     if (self.phoneLines[lineIdx]["callee"]["isPlugged"] < 90):
@@ -341,7 +374,8 @@ class Model(qtc.QObject):
                         self.phoneLines[lineIdx]["Engaged"] = True
                         self.phoneLines[lineIdx]["caller"]["isPlugged"] = True
                         # Start conversation without the ring
-                        self.playFullConvo(self.currConvo,	lineIdx)
+                        # For now anyway can't play full convo without sending event so
+                        self.playFullConvoNoEvent(self.currConvo,	lineIdx)
 
                         # # If this is redo of call to be interrupted then restar timer
                         # # Disabling call interruption
@@ -440,8 +474,10 @@ class Model(qtc.QObject):
         Need lineIdx!!
         """
         print(f" Unplug line {lineIdx} with status of: {self.phoneLines[lineIdx]['unPlugStatus']} "
-               f"while line isEngaged = {self.phoneLines[lineIdx]['isEngaged']}"
+               f"while line isEngaged = {self.phoneLines[lineIdx]['isEngaged']}/n"
+               f"    unplugger index of {personIdx}"
             )
+
 
 
         # if not during restart!
@@ -479,7 +515,7 @@ class Model(qtc.QObject):
             # # it knows this has been unplugged
             # self.phoneLines[lineIdx]["unPlugStatus"] = self.REPLUG_IN_PROGRESS
 
-            if (self.phoneLines[lineIdx]["callee"]["index"] == personIdx):  # callee unplugged
+            if (self.phoneLines[lineIdx]["callee"]["index"] == personIdx):  # callee just unplugged
                 print('   Unplugging callee')
                 # Turn off callee LED
 
@@ -496,6 +532,7 @@ class Model(qtc.QObject):
                 self.setTimeReCall(self.currConvo, lineIdx)
                 # playHello(currConvo, lineIdx);
             elif (self.phoneLines[lineIdx]["caller"]["index"] == personIdx): # caller unplugged
+                print(" Caller just unplugged")
                 self.phoneLines[lineIdx]["caller"]["isPlugged"] = False
                 self.phoneLines[lineIdx]["isEngaged"] = False
                 # Also
@@ -503,7 +540,7 @@ class Model(qtc.QObject):
                 # ? prevLineInUse = -1;
                 # Turn off caller LED
                 self.ledEvent.emit(self.phoneLines[lineIdx]["caller"]["index"], False)
-                self.setTimeToNext(2000);							
+                self.setTimeToNext(1000);							
 
             else: 
                 print('    This should not happen')
@@ -535,7 +572,12 @@ class Model(qtc.QObject):
 
 
         else:   # Line was not fully engaged 
-            print(f' ++ not engaged, callee index: {self.phoneLines[lineIdx]["callee"]["index"]}')
+            print(f' ++ not engaged, callee index: {self.phoneLines[lineIdx]["callee"]["index"]}'
+                  f'    line caller index: {self.phoneLines[lineIdx]["caller"]["index"]}'
+                  f'    convo caller index: {conversations[self.currConvo]["caller"]["index"]}'
+                  f'    incoming personIdx index: {personIdx}'
+                  )
+
 
             # If wrong number, hmm need plug status for wrong number
 
@@ -543,8 +585,22 @@ class Model(qtc.QObject):
             # # First, maybe this is an unplug of "old" call to free up the plugg
             # # caller would be plugged
             if (self.phoneLines[lineIdx]["caller"]["isPlugged"] == True):
-                # Caller is has initiated a call
-                if (self.phoneLines[lineIdx]["unPlugStatus"] == self.WRONG_NUM_IN_PROGRESS):
+                # Caller has initiated a call
+
+                # If this is the caller being unplugged (erroneously)
+                # if incoming person index == caller for this convo
+                if (personIdx == self.phoneLines[lineIdx]["caller"]["index"]):
+                    print("     caller unplugged")
+                    self.vlcPlayers[lineIdx].stop()
+                    self.clearTheLine(lineIdx)
+
+                    self.callInitTimer.start(1000)
+
+
+
+
+
+                elif (self.phoneLines[lineIdx]["unPlugStatus"] == self.WRONG_NUM_IN_PROGRESS):
                     # Unplugging wrong num
                     print(f'  Unplug on wrong number, personIdx: {personIdx}')
                     self.vlcPlayers[lineIdx].stop()

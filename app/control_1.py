@@ -48,6 +48,7 @@ class MainWindow(qtw.QMainWindow):
         # --- timers --- 
         self.bounceTimer=qtc.QTimer()
         self.bounceTimer.timeout.connect(self.continueCheckPin)
+        self.bounceTimer.setSingleShot(True)
         self.blinkTimer=qtc.QTimer()
         self.blinkTimer.timeout.connect(self.blinker)
         # Supress interrupt when plug is just wiggled
@@ -62,7 +63,7 @@ class MainWindow(qtw.QMainWindow):
 
         # Bounce timer less than 200 cause failure to detect 2nd line
         # Tested with 100
-        self.plugEventDetected.connect(lambda: self.bounceTimer.start(200))
+        self.plugEventDetected.connect(lambda: self.bounceTimer.start(300))
         self.plugInToHandle.connect(self.model.handlePlugIn)
         self.unPlugToHandle.connect(self.model.handleUnPlug)
 
@@ -225,8 +226,6 @@ class MainWindow(qtw.QMainWindow):
         # Not able to send param through timer, so pinFlag has been set globaly
         # print("In continue, pinFlag = " + str(self.pinFlag) + " val: " +
         #       str(self.pins[self.pinFlag].value))
-
-        self.bounceTimer.stop()
 
         if (self.pins[self.pinFlag].value == False): # grounded by cable
             """False/grouded, then this event is a plug-in
