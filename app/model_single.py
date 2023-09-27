@@ -148,15 +148,11 @@ class Model(qtc.QObject):
             self.displayText.emit("Incoming call..")
             
             print(f'-- New convo {self.currConvo} being initiated by: ' 
-                    f'{persons[conversations[self.currConvo]["caller"]["index"]]["name"]}'
-                )
+                    f'{persons[conversations[self.currConvo]["caller"]["index"]]["name"]}')
         else:
             # Play congratulations
             print("Congratulations - done!")
-            # self.phoneLines[0].audioTrack =
-            #     new Audio("https://dev.digitalgizmo.com/msm-ed/ed-assets/audio/FinishedActivity.mp3")
-            #     phoneLines[0].audioTrack.play()
-            # Probably reset as well
+            self.playFinished()
 
     def playHello(self, _currConvo, lineIndex):
         print("got to playHello")
@@ -298,6 +294,18 @@ class Model(qtc.QObject):
         self.vlcPlayers[self.requestCorrectLine].play()
         # At this point we hope user unplugs wrong number
         # Will be handled by "unPlug"
+
+    def playFinished(self):
+        self.toneEvents.event_attach(vlc.EventType.MediaPlayerEndReached, 
+            self.supressCallback)         
+
+        self.displayText.emit("Congratulations -- you finished your first shift as a switchboard operator!")
+        # print(f"-- PlayFullConvo {_currConvo}, lineIndex: {lineIndex}")
+
+        media = self.vlcInstances[0].media_new_path("/home/piswitch/Apps/sb-audio/" + 
+            "FinishedActivity.mp3")
+        self.vlcPlayers[0].set_media(media)
+        self.vlcPlayers[0].play()
 
     def supressCallback(self, event):
         print("supress video end callback")
@@ -477,12 +485,7 @@ class Model(qtc.QObject):
                f"while line isEngaged = {self.phoneLines[lineIdx]['isEngaged']}/n"
                f"    unplugger index of {personIdx}"
             )
-
-
-
         # if not during restart!
-
-
 
         # If conversation is in progress -- engaged (implies correct callee)
         if (self.phoneLines[lineIdx]["isEngaged"]):
@@ -499,7 +502,6 @@ class Model(qtc.QObject):
             #     self.phoneLines[lineIdx]["unPlugStatus"] = self.NO_UNPLUG_STATUS
             #     self.stopSilentCall(lineIdx)
             # else: # This is a regular unplug
-
 
             # # Handle the three cases of unplugging engaged call
             # # 1) call will be interrupted 2) call is silenced, 3) regular calls 		
@@ -595,10 +597,6 @@ class Model(qtc.QObject):
                     self.clearTheLine(lineIdx)
 
                     self.callInitTimer.start(1000)
-
-
-
-
 
                 elif (self.phoneLines[lineIdx]["unPlugStatus"] == self.WRONG_NUM_IN_PROGRESS):
                     # Unplugging wrong num
